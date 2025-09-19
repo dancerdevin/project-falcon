@@ -90,10 +90,19 @@ def compare_rent_and_growth(df):
     below_median_rent_df = most_recent_rent < most_recent_median_rent
     below_median_rent_zips = below_median_rent_df[below_median_rent_df].index.to_list()
     print(f"ZIP codes in which most recent rent is below median: {below_median_rent_zips}")
+    # store series/dict indexed to zip containing median rent growth ranked by furthest below median (?)
 
     # Lastly, find common elements of both lists using set intersection.
     intersecting_zips = list(set(above_avg_growth_zips).intersection(below_median_rent_zips))
     print(f"ZIP codes in which rent growth is above average and rent is below median: {intersecting_zips}")
+
+    # Percentile ranking of ZIP codes in terms of higher rent growth and lower recent rent.
+    avg_growth_pct_rank = avg_growth_df.rank(pct=True)
+    recent_rent_pct_rank = most_recent_rent.rank(pct=True, ascending=False)
+    rank_comparison_df = pd.concat([avg_growth_pct_rank, recent_rent_pct_rank], axis=1)
+    rank_comparison_df["Combined_Rank"] = (rank_comparison_df["Annual_Growth_By_Zip"] + rank_comparison_df["Rent"]) / 2
+    sorted_rank_comparison_df = rank_comparison_df.sort_values(by="Combined_Rank", ascending=False).dropna(subset="Combined_Rank")
+    print(f"ZIP codes ranked in order of higher rent growth averaged with lower recent rent: \n{sorted_rank_comparison_df}")
 
 
 def zillow_data_parser(data):
