@@ -28,7 +28,9 @@ def aggregate_rent_analysis(df):
 
     current_rent_iqr_by_county(df)
 
-    compare_rent_and_growth(df)    
+    compare_rent_and_growth(df)
+
+    compare_rent_and_growth(df, above_median=True)       
 
 
 def annualized_growth_by_locale(df):
@@ -68,7 +70,7 @@ def current_rent_iqr_by_county(df):
     print(f"Rent IQR for most recent date by county: \n{rent_iqr_by_county}")
 
 
-def compare_rent_and_growth(df):
+def compare_rent_and_growth(df, above_median=False):
     # Filter out before 1/2024 and find above-average rent-growth and below-median rent. First, filter the dates.
     target_date = pd.to_datetime("2024-01-01")
     after_2024_df = df[df.index >= target_date]
@@ -84,17 +86,22 @@ def compare_rent_and_growth(df):
     above_avg_growth_zips = above_avg_growth_df[above_avg_growth_df].index.to_list()
     print(f"ZIP codes in which rent growth is above average: {above_avg_growth_zips}")
 
-    # Now, identify a separate list of zips where the most recent month of rent is below-median.
+    # Now, identify a separate list of zips where the most recent month of rent is below-median, or above if specified.
     most_recent_rent = after_2024_df.groupby("Zip")["Rent"].last() # series of most recent rents by zip
     most_recent_median_rent = most_recent_rent.median()
-    below_median_rent_df = most_recent_rent < most_recent_median_rent
-    below_median_rent_zips = below_median_rent_df[below_median_rent_df].index.to_list()
-    print(f"ZIP codes in which most recent rent is below median: {below_median_rent_zips}")
+    if above_median:
+        median_comparison_string = "above"
+        median_rent_comparison_df = most_recent_rent > most_recent_median_rent
+    else:
+        median_comparison_string = "below"
+        median_rent_comparison_df = most_recent_rent < most_recent_median_rent
+    median_rent_zips = median_rent_comparison_df[median_rent_comparison_df].index.to_list()
+    print(f"ZIP codes in which most recent rent is {median_comparison_string} median: {median_rent_zips}")
     # store series/dict indexed to zip containing median rent growth ranked by furthest below median (?)
 
     # Lastly, find common elements of both lists using set intersection.
-    intersecting_zips = list(set(above_avg_growth_zips).intersection(below_median_rent_zips))
-    print(f"ZIP codes in which rent growth is above average and rent is below median: {intersecting_zips}")
+    intersecting_zips = list(set(above_avg_growth_zips).intersection(median_rent_zips))
+    print(f"ZIP codes in which rent growth is above average and rent is {median_comparison_string} median: {intersecting_zips}")
 
     # Percentile ranking of ZIP codes in terms of higher rent growth and lower recent rent.
     avg_growth_pct_rank = avg_growth_df.rank(pct=True)
