@@ -80,7 +80,7 @@ def compare_rent_and_growth(df, above_median=False):
     try:
         avg_growth_df = after_2024_df.groupby("Zip")["Annual_Growth_By_Zip"].mean()
     except:
-        df["Annual_Growth_By_Zip"] = (df.groupby("Zip")["Rent"].pct_change(periods=12) * 100)
+        df["Annual_Growth_By_Zip"] = (df.groupby("Zip")["Rent"].pct_change(periods=12, fill_method=None) * 100)
         avg_growth_df = after_2024_df.groupby("Zip")["Annual_Growth_By_Zip"].mean()
     above_avg_growth_df = avg_growth_df > avg_growth_df.mean()
     above_avg_growth_zips = above_avg_growth_df[above_avg_growth_df].index.to_list()
@@ -97,7 +97,6 @@ def compare_rent_and_growth(df, above_median=False):
         median_rent_comparison_df = most_recent_rent < most_recent_median_rent
     median_rent_zips = median_rent_comparison_df[median_rent_comparison_df].index.to_list()
     print(f"ZIP codes in which most recent rent is {median_comparison_string} median: {median_rent_zips}")
-    # store series/dict indexed to zip containing median rent growth ranked by furthest below median (?)
 
     # Lastly, find common elements of both lists using set intersection.
     intersecting_zips = list(set(above_avg_growth_zips).intersection(median_rent_zips))
@@ -112,8 +111,39 @@ def compare_rent_and_growth(df, above_median=False):
     print(f"ZIP codes ranked in order of higher rent growth averaged with lower recent rent: \n{sorted_rank_comparison_df}")
 
 
-def zillow_data_parser(data):
-    # A wrapper function specifically to parse our Zillow housing data and feed it into aggregate_rents_by_zip().
+def compare_price_to_rent(price_data, rent_data):
+    # Ranking of ZIP codes' price-to-rent ratio and percentile ranking of price-to-rent ratio and higher rent growth.
+    if "Date" not in price_data.columns.to_list() or "Date" not in rent_data.columns.to_list():
+        return print("Error: datasets should be parsed to contain a 'Date' column and be pivoted long.")
+    
+    avg_home_value_by_zip = price_data.groupby("Zip")["Value"].mean()
+    avg_rent_by_zip = rent_data.groupby("Zip")["Rent"].mean()
+    price_to_rent_by_zip = avg_home_value_by_zip / avg_rent_by_zip
+    sorted_price_to_rent_by_zip = price_to_rent_by_zip.sort_values(ascending=True)
+    print(f"ZIP codes ranked in ascending order of price-to-rent ratio: \n{sorted_price_to_rent_by_zip}")
+
+    # If annualized_growth_by_locale has been called, the "Annual_Growth_By_Zip" column will exist. If not, define it.
+    try:
+        avg_rent_growth_df = rent_data.groupby("Zip")["Annual_Growth_By_Zip"].mean()
+    except:
+        rent_data["Annual_Growth_By_Zip"] = (rent_data.groupby("Zip")["Rent"].pct_change(periods=12, fill_method=None) * 100)
+        avg_rent_growth_df = rent_data.groupby("Zip")["Annual_Growth_By_Zip"].mean()
+    
+    # Percentile ranking of ZIP codes in terms of higher rent growth and lower price-to-rent ratio.
+    avg_growth_pct_rank = avg_rent_growth_df.rank(pct=True)
+    price_to_rent_pct_rank = price_to_rent_by_zip.rank(pct=True, ascending=False)
+    rank_comparison_df = pd.concat([avg_growth_pct_rank, price_to_rent_pct_rank], axis=1)
+    rank_comparison_df.rename(columns={rank_comparison_df.columns[0]: "Avg_Growth_Pct_Rank", rank_comparison_df.columns[1]: "Price_to_Rent_Pct_Rank"}, inplace=True)
+    rank_comparison_df["Combined_Rank"] = (rank_comparison_df["Avg_Growth_Pct_Rank"] + rank_comparison_df["Price_to_Rent_Pct_Rank"]) / 2
+    sorted_rank_comparison_df = rank_comparison_df.sort_values(by="Combined_Rank", ascending=False).dropna(subset="Combined_Rank")
+    print(f"ZIP codes ranked in order of higher rent growth averaged with lower price-to-rent ratio: \n{sorted_rank_comparison_df}")
+
+
+def zillow_data_parser(data, metric):
+    # A wrapper function specifically to parse our Zillow housing data and feed it into an aggregation function.
+    if metric.lower() not in ["rent", "value"]:
+        return print("Please specify if this Zillow dataset concerns 'rent' or home 'value'.")
+    
     df = pd.read_csv(data, delimiter=",")
 
     # Zillow data is wide: there's a column for each month of data. I'll convert it to long format for analysis.
@@ -132,9 +162,11 @@ def zillow_data_parser(data):
                       id_vars=["Zip", "County", "State"],
                       value_vars=renamed_df.iloc[:, 3:-1],
                       var_name="Date",
-                      value_name="Rent")
+                      value_name=metric.title())
     return long_df
 
 
-long_df = zillow_data_parser("zillow_data.csv")
-aggregate_rent_analysis(long_df)
+rent_df = zillow_data_parser("zillow_rent_data.csv", "rent")
+price_df = zillow_data_parser("zillow_sfh_value_data.csv", "value")
+# compare_price_to_rent(price_df, rent_df)
+# aggregate_rent_analysis(rent_df)
