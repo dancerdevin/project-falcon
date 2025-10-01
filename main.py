@@ -1,25 +1,33 @@
 import pandas as pd
-# import numpy as np
-from scipy.stats import iqr
+from enum import StrEnum
 
 # List of ZIP codes in which we are currently interested:
 zip_codes = [98403, 98404, 98405, 98406, 98407, 98408, 98409, 98418, 98422, 98465, 98424, 98466, 98467, 98332, 98335]
 # Result 9-12-25: 98408, center-south Tacoma, is where annual *growth* is above county average but *rent* is below median.
 
+class ExpectedColumns(StrEnum):
+    ZIP = "Zip"
+    COUNTY = "County"
+    STATE = "State"
+    DATE = "Date"
+    RENT = "Rent"
+    VALUE = "Value"
+    ANNUAL_GROWTH_BY_ZIP = "Annual_Growth_By_Zip"
+
 def aggregate_analysis(df, metric):
-    # Core functionality for Project Falcon #1: based on aggregate rental market index, identify
-    # 1) Annualized % growth (average and median) aggregated for 1a) county and 1b) state,
-    # 2) Absolute index value IQR today by county, and
-    # 3) Zip codes where the annual growth has been above county average since 1/2024 but where the absolute
-    # index value is below the median for the county.
+    """Core functionality for Project Falcon #1: based on aggregate rental market index, identify
+    1) Annualized % growth (average and median) aggregated for 1a) county and 1b) state,
+    2) Absolute index value IQR today by county, and
+    3) Zip codes where the annual growth has been above county average since 1/2024 but where the absolute
+    index value is below the median for the county."""
     
     if metric != metric.title():
         metric = metric.title()
-    if metric not in ["Rent", "Value"]:
-        return print("Please specify how to aggregate: in terms of 'rent' or home 'value'.")
+    if metric not in [ExpectedColumns.RENT, ExpectedColumns.VALUE]:
+        raise ValueError("Please specify how to aggregate: in terms of 'rent' or home 'value'.")
     
-    if not df.columns.to_list() == ["Zip", "County", "State", "Date", metric]:
-        return print("Error: dataframe should contain only the five columns Zip, County, State, Date, and either Rent or Value.")
+    if not df.columns.to_list() == [ExpectedColumns.ZIP, ExpectedColumns.COUNTY, ExpectedColumns.STATE, ExpectedColumns.DATE, metric]:
+        raise ValueError("Error: dataframe should contain only the five columns Zip, County, State, Date, and either Rent or Value.")
 
     df["Date"] = pd.to_datetime(df["Date"]) # Ensuring that the date column is converted to datetime objects
 
@@ -31,11 +39,9 @@ def aggregate_analysis(df, metric):
 
     df = annualized_growth_by_locale(df, metric)
 
-    current_iqr_by_county(df, metric)
+    print_current_iqr(df, metric)
 
-    compare_rent_or_value_and_growth(df, metric)
-
-    # compare_rent_or_value_and_growth(df, above_median=True)       
+    compare_metric_and_growth(df, metric)    
 
 
 def annualized_growth_by_locale(df, metric):
@@ -61,46 +67,54 @@ def annualized_growth_by_locale(df, metric):
     return df
 
 
-def current_iqr_by_county(df, metric):
-    # First, filter the dataframe, indexed to date, by most recent date using max().
+def print_current_iqr(df, metric, group="County"):
+    # Prints Q1, Q3, and IQR of rent/value. Defaults to grouping by county.
+    def q1(group):
+        return group.quantile(0.25)
+    
+    def q3(group):
+        return group.quantile(0.75)
+    
+    def iqr(group):
+        return group.quantile(0.75) - group.quantile(0.25)
+    
+    f = {metric: [q1, q3, iqr]}
+    
+    # Filter the dataframe, indexed to date, by most recent date using max().
     most_recent_df = df[df.index == df.index.max()]
 
+    # Apply aggregate functions to filtered dataframe to assign multi-index columns.
+    quartiles_df = most_recent_df.groupby(group).agg(f)
+
+    # Flatten multi-index columns back into a 2-dimensional dataframe for ease of reference.
+    quartiles_df.columns = list(map('_'.join, quartiles_df.columns.values))
+
     # Next, print the IQR of the rent in this subset, grouped by county.
-    quartiles_by_county = most_recent_df.groupby("County")[metric].quantile([0.25, 0.75])
-    print(f"{metric} 1st and 3rd Quartiles for most recent date by county: \n {quartiles_by_county}")
-
-    # Scipy's iqr() behavior is peculiar here: I need to transform(iqr) and then sum() the quartiles, grouping each time.
-    iqr_by_county = quartiles_by_county.groupby("County").transform(iqr)
-    iqr_by_county = iqr_by_county.groupby("County").sum()
-    print(f"{metric} IQR for most recent date by county: \n{iqr_by_county}")
+    print(f"{metric} Quartiles and IQR for most recent date by {group}: \n {quartiles_df}")
 
 
-def compare_rent_or_value_and_growth(df, metric, above_median=False):
+def check_for_growth_by_zip(df):
+    # Multiple functions rely on annualized_growth_by_locale generating the "Annual_Growth_by_Zip" column, so check for it.
+    if ExpectedColumns.ANNUAL_GROWTH_BY_ZIP not in df.columns.to_list():
+        raise ValueError("Function expects Annual_Growth_by_Zip column. Call annualized_growth_by_locale first.")
+    
+
+def compare_metric_and_growth(df, metric, above_median=False):
     # Filter out before 1/2024 and find above-average rent-growth and below-median rent. First, filter the dates.
     target_date = pd.to_datetime("2024-01-01")
     after_2024_df = df[df.index >= target_date]
     metric_lower = metric.lower()
 
     # Next, identify ZIP codes where growth is above county average.
-    # If annualized_growth_by_locale has been called, the "Annual_Growth_By_Zip" column will exist. If not, define it.
-    try:
-        avg_growth_df = after_2024_df.groupby("Zip")["Annual_Growth_By_Zip"].mean()
-    except:
-        df["Annual_Growth_By_Zip"] = (df.groupby("Zip")["Rent"].pct_change(periods=12, fill_method=None) * 100)
-        avg_growth_df = after_2024_df.groupby("Zip")["Annual_Growth_By_Zip"].mean()
+    check_for_growth_by_zip(df)
+    avg_growth_df = after_2024_df.groupby("Zip")["Annual_Growth_By_Zip"].mean()
     above_avg_growth_df = avg_growth_df > avg_growth_df.mean()
     above_avg_growth_zips = above_avg_growth_df[above_avg_growth_df].index.to_list()
     print(f"ZIP codes in which {metric_lower} growth is above average: {above_avg_growth_zips}")
 
-    # Now, identify a separate list of zips where the most recent month's value is below-median, or above if specified.
+    # Identify a separate list of zips where the most recent month's value is below-median, or above if specified.
     most_recent_value = after_2024_df.groupby("Zip")[metric].last()
-    most_recent_median_value = most_recent_value.median()
-    if above_median:
-        median_comparison_string = "above"
-        median_value_comparison_df = most_recent_value > most_recent_median_value
-    else:
-        median_comparison_string = "below"
-        median_value_comparison_df = most_recent_value < most_recent_median_value
+    median_comparison_string, median_value_comparison_df = _check_above_or_below_median(most_recent_value, above_median)
     median_value_zips = median_value_comparison_df[median_value_comparison_df].index.to_list()
     print(f"ZIP codes in which most recent {metric_lower} is {median_comparison_string} median: {median_value_zips}")
 
@@ -117,6 +131,17 @@ def compare_rent_or_value_and_growth(df, metric, above_median=False):
     print(f"ZIP codes ranked in order of higher {metric_lower} growth averaged with lower recent {metric_lower}: \n{sorted_rank_comparison_df}")
 
 
+def _check_above_or_below_median(recent_values, above_median):
+    most_recent_median_values = recent_values.median()
+    if above_median:
+        median_comparison_string = "above"
+        median_value_comparison_df = recent_values > most_recent_median_values
+    else:
+        median_comparison_string = "below"
+        median_value_comparison_df = recent_values < most_recent_median_values
+    return median_comparison_string, median_value_comparison_df
+
+
 def compare_price_to_rent(price_data, rent_data):
     # Ranking of ZIP codes' price-to-rent ratio and percentile ranking of price-to-rent ratio and higher rent growth.
     if "Date" not in price_data.columns.to_list() or "Date" not in rent_data.columns.to_list():
@@ -128,12 +153,8 @@ def compare_price_to_rent(price_data, rent_data):
     sorted_price_to_rent_by_zip = price_to_rent_by_zip.sort_values(ascending=True)
     print(f"ZIP codes ranked in ascending order of price-to-rent ratio: \n{sorted_price_to_rent_by_zip}")
 
-    # If annualized_growth_by_locale has been called, the "Annual_Growth_By_Zip" column will exist. If not, define it.
-    try:
-        avg_rent_growth_df = rent_data.groupby("Zip")["Annual_Growth_By_Zip"].mean()
-    except:
-        rent_data["Annual_Growth_By_Zip"] = (rent_data.groupby("Zip")["Rent"].pct_change(periods=12, fill_method=None) * 100)
-        avg_rent_growth_df = rent_data.groupby("Zip")["Annual_Growth_By_Zip"].mean()
+    check_for_growth_by_zip(rent_data)
+    avg_rent_growth_df = rent_data.groupby("Zip")["Annual_Growth_By_Zip"].mean()
     
     # Percentile ranking of ZIP codes in terms of higher rent growth and lower price-to-rent ratio.
     avg_growth_pct_rank = avg_rent_growth_df.rank(pct=True)
@@ -177,5 +198,5 @@ def zillow_data_parser(data, metric):
 rent_df = zillow_data_parser("zillow_rent_data.csv", "rent")
 price_df = zillow_data_parser("zillow_sfh_value_data.csv", "value")
 # compare_price_to_rent(price_df, rent_df)
-# aggregate_analysis(rent_df, "rent")
-aggregate_analysis(price_df, "value")
+aggregate_analysis(rent_df, "rent")
+# aggregate_analysis(price_df, "value")
