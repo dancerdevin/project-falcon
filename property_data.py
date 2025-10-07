@@ -49,6 +49,23 @@ def closest_address_to_lat_long(latitude, longitude):
         return location.address
     else:
         raise Exception("Error: Geolocator did not return a valid location.")
+    
+
+def api_call_for_json_dump(url, params, name_string, headers={}):
+    # Centralized meta-function for API calls. Writes .json file to disk.
+    try:
+        response = requests.get(url, params=params, headers=headers)
+        response.raise_for_status()
+
+        data = response.json()
+        datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output_name = f"{name_string}_{datetime_string}.json"
+
+        with open(output_name, "w") as f:
+            json.dump(data, f, indent=4)
+
+    except requests.exceptions.RequestException as err:
+        print(f"Error: {err}")
 
 
 def rentometer_api(location):
@@ -65,19 +82,7 @@ def rentometer_api(location):
 
     params = location_params(location, default_params)
 
-    try:
-        response = requests.get(URL, params=params)
-        response.raise_for_status()
-
-        data = response.json()
-        datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_name = f"rentometer_{datetime_string}.json"
-
-        with open(output_name, "w") as f:
-            json.dump(data, f, indent=4)
-
-    except requests.exceptions.RequestException as err:
-        print(f"Error: {err}")
+    api_call_for_json_dump(URL, params, "rentometer")
 
 
 def rentcast_api(location):
@@ -99,19 +104,7 @@ def rentcast_api(location):
         "X-API-KEY": API_KEY,
     }
 
-    try:
-        response = requests.get(URL, params=params, headers=headers)
-        response.raise_for_status()
-
-        data = response.json()
-        datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_name = f"rentcast_{datetime_string}.json"
-
-        with open(output_name, "w") as f:
-            json.dump(data, f, indent=4)
-
-    except requests.exceptions.RequestException as err:
-        print(f"Error: {err}")
+    api_call_for_json_dump(URL, params, "rentcast", headers)
 
 
 def parse_rentcast_json_by_zip(data, zipcode):
@@ -124,6 +117,6 @@ def parse_rentcast_json_by_zip(data, zipcode):
 
 # lat_long = lat_long_from_zip(98408)
 # address = closest_address_to_lat_long(latitude, longitude)
-# rentometer_api(latitude, longitude)
+# rentometer_api(lat_long)
 # rentcast_api(lat_long)
 # parse_rentcast_json_by_zip("rentcast_2025-10-06_15-40-25.json", 98408)
