@@ -4,9 +4,11 @@ import pgeocode
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from geopy.geocoders import Nominatim
 
 
 load_dotenv() # Load API keys
+geolocator = Nominatim(user_agent="peregrin_app") # Instantiate address-finder
 
 
 def lat_long_from_zip(zip_code):
@@ -21,22 +23,47 @@ def lat_long_from_zip(zip_code):
     print(f"Central latitude for ZIP: {latitude}")
     print(f"Central longitude for ZIP: {longitude}")
 
-    return str(latitude), str(longitude) # Stringify for API call
+    return [str(latitude), str(longitude)] # Stringify for API call and return as list
 
 
-def rentometer_api(latitude, longitude):
+def location_params(location, params):
+    # Meta-function to determine if API call will be passed an address or a lat-long.
+    if isinstance(location, str):
+        params["address"] = location
+
+    elif isinstance(location, list):
+        if len(location) != 2:
+            raise Exception("Error: list input should contain two elements, latitude and longitude.")
+        params["latitude"] = location[0]
+        params["longitude"] = location[1]
+
+    else:
+        raise Exception("Error: for location, please input either an address as a string or lat-long as list.")
+    
+    return params
+
+
+def closest_address_to_lat_long(latitude, longitude):
+    location = geolocator.reverse(f"{latitude}, {longitude}")
+    if location:
+        return location.address
+    else:
+        raise Exception("Error: Geolocator did not return a valid location.")
+
+
+def rentometer_api(location):
     # Write JSON dump from Rentometer API call.
     API_KEY = os.getenv("RENTOMETER_API_KEY")
     URL = "https://www.rentometer.com/api/v1/summary"
 
-    params = {
+    default_params = {
         "api_key": API_KEY,
-        "latitude": latitude,
-        "longitude": longitude,
         "bedrooms": "3",
         "baths": "1.5+",
         "building_type": "house"
     }
+
+    params = location_params(location, default_params)
 
     try:
         response = requests.get(URL, params=params)
@@ -53,19 +80,20 @@ def rentometer_api(latitude, longitude):
         print(f"Error: {err}")
 
 
-def rentcast_api(latitude, longitude):
+def rentcast_api(location):
     # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
     URL = "https://api.rentcast.io/v1/properties"
 
-    params = {
+    default_params = {
         "api_key": API_KEY,
-        "latitude": latitude,
-        "longitude": longitude,
         "bedrooms": "3",
         "baths": "1.5+",
-        "radius": "5",
+        "radius": "3",
+        "price": "250000:550000"
     }
+
+    params = location_params(location, default_params)
 
     headers = {
         "X-API-KEY": API_KEY,
@@ -94,7 +122,8 @@ def parse_rentcast_json_by_zip(data, zipcode):
     print(subset_data)
 
 
-latitude, longitude = lat_long_from_zip(98408)
+# lat_long = lat_long_from_zip(98408)
+# address = closest_address_to_lat_long(latitude, longitude)
 # rentometer_api(latitude, longitude)
-# rentcast_api(latitude, longitude)
+# rentcast_api(lat_long)
 # parse_rentcast_json_by_zip("rentcast_2025-10-06_15-40-25.json", 98408)
