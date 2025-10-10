@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 from geopy.geocoders import Nominatim
+import math
 
 
 load_dotenv() # Load API keys
@@ -29,7 +30,15 @@ def lat_long_from_zip(zip_code):
 def location_params(location, params):
     # Meta-function to determine if API call will be passed an address or a lat-long.
     if isinstance(location, str):
-        params["address"] = location
+        if " " in location: # Infer input without whitespace is stringified zipcode
+            params["zipCode"] = location
+        else: # Infer input with whitespace is address
+            params["address"] = location
+
+    elif isinstance(location, int):
+        if len(str(location)) != 5:
+            raise Exception("Error: invalid zipcode input. Must have length of 5.")
+        params["zipCode"] = location
 
     elif isinstance(location, list):
         if len(location) != 2:
@@ -68,6 +77,14 @@ def api_call_for_json_dump(url, params, name_string, headers={}):
         print(f"Error: {err}")
 
 
+def multiple_rentcast_calls_with_offset(URL, params, headers, results):
+    number_of_calls = math.ceil(results / 500)
+    for i in range(1, number_of_calls):
+        params["offset"] = str(i * 500)
+        print("Attempting API call with offset of " + params["offset"])
+        api_call_for_json_dump(URL, params, "rentcast", headers)
+
+
 def rentometer_api(location):
     # Write JSON dump from Rentometer API call.
     API_KEY = os.getenv("RENTOMETER_API_KEY")
@@ -85,7 +102,7 @@ def rentometer_api(location):
     api_call_for_json_dump(URL, params, "rentometer")
 
 
-def rentcast_api(location):
+def rentcast_api(location, results=500):
     # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
     URL = "https://api.rentcast.io/v1/properties"
@@ -94,8 +111,7 @@ def rentcast_api(location):
         "api_key": API_KEY,
         "bedrooms": "3",
         "baths": "1.5+",
-        "radius": "3",
-        "price": "250000:550000"
+        "price": "250000:550000",
     }
 
     params = location_params(location, default_params)
@@ -104,7 +120,14 @@ def rentcast_api(location):
         "X-API-KEY": API_KEY,
     }
 
-    api_call_for_json_dump(URL, params, "rentcast", headers)
+    if not isinstance(results, int):
+        raise Exception("Error: please input a valid integer for the number of results requested.")
+    elif results > 500:
+        print("Offset required, as result exceeds limit of 500. Attempting multiple calls.")
+        multiple_rentcast_calls_with_offset(URL, params, headers, results)
+    else:
+        params["limit"] = results
+        api_call_for_json_dump(URL, params, "rentcast", headers)
 
 
 def parse_rentcast_json_by_zip(data, zipcode):
@@ -112,11 +135,10 @@ def parse_rentcast_json_by_zip(data, zipcode):
     with open(data, 'r') as file:
         json_data = json.load(file)
     subset_data = [entry for entry in json_data if entry.get("zipCode") == str(zipcode)]
-    print(subset_data)
 
 
 # lat_long = lat_long_from_zip(98408)
 # address = closest_address_to_lat_long(latitude, longitude)
 # rentometer_api(lat_long)
-# rentcast_api(lat_long)
-# parse_rentcast_json_by_zip("rentcast_2025-10-06_15-40-25.json", 98408)
+rentcast_api(98408, 2200)
+# parse_rentcast_json_by_zip("rentcast_2025-10-09_16-22-59.json", 98408)
