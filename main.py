@@ -1,5 +1,6 @@
 import pandas as pd
 from enum import StrEnum
+from json_to_df import json_to_df
 
 # List of ZIP codes in which we are currently interested:
 zip_codes = [98403, 98404, 98405, 98406, 98407, 98408, 98409, 98418, 98422, 98465, 98424, 98466, 98467, 98332, 98335]
@@ -195,8 +196,36 @@ def zillow_data_parser(data, metric):
     return long_df
 
 
-rent_df = zillow_data_parser("zillow_rent_data.csv", "rent")
-price_df = zillow_data_parser("zillow_sfh_value_data.csv", "value")
+def rentcast_data_parser(datetime=None):
+    # Use json_to_df to parse rentcast data for initial desired inputs. Returns dict subset.
+    df = json_to_df("rentcast", datetime)
+    max_value = 550000
+    min_bedrooms = 3
+    min_bathrooms = 1.5
+    property_type = "Single Family"
+
+    # Extract most recent home value from nested dictionary.
+    value_df = pd.json_normalize(df["taxAssessments"])
+    df["value"] = value_df["2025.value"]
+
+    # Extract most recent property tax assessment.
+    tax_df = pd.json_normalize(df["propertyTaxes"])
+    df["property_tax"] = tax_df["2025.total"]
+
+    # Extract relevant features.
+    features_df = pd.json_normalize(df["features"])
+    df["garage"] = features_df["garage"]
+    df["heatingType"] = features_df["heatingType"]
+
+    # Parse dataframe by specified constants and return.
+    subset_df = df[(df["value"] <= max_value) & (df["bedrooms"] >= min_bedrooms) & (df["bathrooms"] >= min_bathrooms) & (df["propertyType"] == property_type)].reset_index(drop=True)
+    return subset_df
+
+
+# rent_df = zillow_data_parser("zillow_rent_data.csv", "rent")
+# price_df = zillow_data_parser("zillow_sfh_value_data.csv", "value")
 # compare_price_to_rent(price_df, rent_df)
-aggregate_analysis(rent_df, "rent")
+# aggregate_analysis(rent_df, "rent")
 # aggregate_analysis(price_df, "value")
+property_df = rentcast_data_parser("2025-10-10_12-42")
+# property_df.to_csv("rentcast_test.csv")
