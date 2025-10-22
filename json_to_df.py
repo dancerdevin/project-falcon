@@ -18,7 +18,7 @@ def json_to_df(api=None, datetime=None):
 
     df_list = []
     for file in files:
-        with open(file, 'r') as json_dump:
+        with open(file, "r", encoding="utf-8-sig") as json_dump:
             print(f"Concatenating to dataframe: {file}")
             df = pd.read_json(json_dump)
             df["filename"] = os.path.basename(file)

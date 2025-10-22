@@ -1,6 +1,8 @@
 import pandas as pd
 from enum import StrEnum
 from json_to_df import json_to_df
+from property_data import rentometer_api
+from datetime import datetime
 
 # List of ZIP codes in which we are currently interested:
 zip_codes = [98403, 98404, 98405, 98406, 98407, 98408, 98409, 98418, 98422, 98465, 98424, 98466, 98467, 98332, 98335]
@@ -14,6 +16,7 @@ class ExpectedColumns(StrEnum):
     RENT = "Rent"
     VALUE = "Value"
     ANNUAL_GROWTH_BY_ZIP = "Annual_Growth_By_Zip"
+    PROPERTY_TAX = "property_tax"
 
 def aggregate_analysis(df, metric):
     """Core functionality for Project Falcon #1: based on aggregate rental market index, identify
@@ -222,10 +225,31 @@ def rentcast_data_parser(datetime=None):
     return subset_df
 
 
+def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
+    # For each address in parsed rentcast data, find rent data, add as expected income, and return dataframe.
+    if ExpectedColumns.PROPERTY_TAX not in parsed_data.columns.to_list():
+        raise Exception("Error: property tax column missing. First call rentcast_data_parser on dataframe input.")
+    
+    # If I've specified a datetime, the JSON dumps already exist on disk. If not, make necessary API calls.
+    # For each address in the parsed_data, apply rentometer_api function in property_data.
+    if datetime_string is None:
+        datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        parsed_data["formattedAddress"].apply(rentometer_api)
+
+    # Load JSON dumps saved to disk from relevant datetime (right before making API calls) and concatenate into dataframe.
+    rent_data = json_to_df("rentometer", datetime_string)
+
+    # Match addresses between parsed_data and new Rentometer JSON dumps, add Rentometer data, and return.
+    parsed_data = parsed_data.rename(columns={"formattedAddress": "address"})
+    joined_data = pd.merge(parsed_data, rent_data, on="address", how="inner") # Presumes exact same address string
+    return joined_data
+
+
 # rent_df = zillow_data_parser("zillow_rent_data.csv", "rent")
 # price_df = zillow_data_parser("zillow_sfh_value_data.csv", "value")
 # compare_price_to_rent(price_df, rent_df)
 # aggregate_analysis(rent_df, "rent")
 # aggregate_analysis(price_df, "value")
-property_df = rentcast_data_parser("2025-10-10_12-42")
+property_df = rentcast_data_parser("2025-10-10_12-42-27")
 # property_df.to_csv("rentcast_test.csv")
+add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")

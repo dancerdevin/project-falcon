@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from geopy.geocoders import Nominatim
 import math
+import urllib.parse
 
 
 load_dotenv() # Load API keys
@@ -30,9 +31,10 @@ def lat_long_from_zip(zip_code):
 def location_params(location, params):
     # Meta-function to determine if API call will be passed an address or a lat-long.
     if isinstance(location, str):
-        if " " in location: # Infer input without whitespace is stringified zipcode
+        if " " not in location: # Infer input without whitespace is stringified zipcode
             params["zipCode"] = location
         else: # Infer input with whitespace is address
+            location = ' '.join(location.split()) # Normalize whitespace from JSON dump
             params["address"] = location
 
     elif isinstance(location, int):
@@ -87,6 +89,7 @@ def multiple_rentcast_calls_with_offset(URL, params, headers, results):
 
 def rentometer_api(location):
     # Write JSON dump from Rentometer API call.
+    print("Calling rentometer API function for " + location)
     API_KEY = os.getenv("RENTOMETER_API_KEY")
     URL = "https://www.rentometer.com/api/v1/summary"
 
@@ -140,5 +143,6 @@ def parse_rentcast_json_by_zip(data, zipcode):
 # lat_long = lat_long_from_zip(98408)
 # address = closest_address_to_lat_long(latitude, longitude)
 # rentometer_api(lat_long)
-rentcast_api(98408, 2200)
+# rentcast_api(98408, 2200)
 # parse_rentcast_json_by_zip("rentcast_2025-10-09_16-22-59.json", 98408)
+# rentometer_api("6478 S M St, Tacoma, WA 98408")
