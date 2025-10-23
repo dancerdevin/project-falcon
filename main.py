@@ -3,6 +3,7 @@ from enum import StrEnum
 from json_to_df import json_to_df
 from property_data import rentometer_api
 from datetime import datetime
+from amortization.amount import calculate_amortization_amount
 
 # List of ZIP codes in which we are currently interested:
 zip_codes = [98403, 98404, 98405, 98406, 98407, 98408, 98409, 98418, 98422, 98465, 98424, 98466, 98467, 98332, 98335]
@@ -238,11 +239,37 @@ def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
 
     # Load JSON dumps saved to disk from relevant datetime (right before making API calls) and concatenate into dataframe.
     rent_data = json_to_df("rentometer", datetime_string)
+    subset_rent_data = rent_data[["address", "mean", "median", "min", "max"]].reset_index(drop=True)
+    subset_rent_data = subset_rent_data.drop_duplicates()
 
     # Match addresses between parsed_data and new Rentometer JSON dumps, add Rentometer data, and return.
     parsed_data = parsed_data.rename(columns={"formattedAddress": "address"})
-    joined_data = pd.merge(parsed_data, rent_data, on="address", how="inner") # Presumes exact same address string
+    joined_data = pd.merge(parsed_data, subset_rent_data, on="address", how="inner") # Presumes exact same address string
     return joined_data
+
+
+def add_costs_to_parsed_rentcast_data(parsed_data):
+    # Estimate costs: mortgage, insurance, taxes, maintenance/capex, property management, vacancy.
+    loan_to_value = .7
+    apr = 0.07
+    amort_months = 360
+    parsed_data["mortgage"] = parsed_data["value"].apply(lambda x: calculate_amortization_amount((x * loan_to_value), apr, amort_months))
+    
+    est_monthly_insurance = 1000 / 12
+    parsed_data["insurance"] = est_monthly_insurance
+
+    # Rentcast's property tax data is by year, so calculating month-by-month in order to sum costs.
+    parsed_data["monthly_tax"] = parsed_data["property_tax"] / 12
+
+    # Estimated maintenance/capex: 1% of house value per year, divided by 12 for monthly
+    parsed_data["capex"] = parsed_data["value"].apply(lambda x: (x * 0.01) / 12)
+
+    # Estimated management costs: 10% of monthly rent (using median as more robust indicator)
+    parsed_data["management"] = parsed_data["median"] * .1
+
+    parsed_data["sum_costs"] = parsed_data[["mortgage", "insurance", "capex", "management", "monthly_tax"]].sum(axis=1)
+
+    return parsed_data
 
 
 # rent_df = zillow_data_parser("zillow_rent_data.csv", "rent")
@@ -251,6 +278,5 @@ def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
 # aggregate_analysis(rent_df, "rent")
 # aggregate_analysis(price_df, "value")
 property_df = rentcast_data_parser("2025-10-10_12-42-27")
-# property_df.to_csv("rentcast_test.csv")
 joined_data = add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
-joined_data.to_csv("join_test.csv")
+costs_data = add_costs_to_parsed_rentcast_data(joined_data)
