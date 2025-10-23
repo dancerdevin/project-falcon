@@ -9,6 +9,17 @@ class ExpectedColumns(StrEnum):
     PROPERTY_TAX = "property_tax"
 
 
+def aggregate_analysis(rentcast_datetime_string=None, rentometer_datetime_string=None):
+    # Parses Rentcast data in JSON dumps by datetime and incorporates Rentometer rent data and costs.
+    df = rentcast_data_parser(rentcast_datetime_string)
+
+    df_with_rent = add_rent_to_parsed_rentcast_data(df, rentometer_datetime_string)
+
+    df_with_rent_and_cost = add_costs_to_parsed_rentcast_data(df_with_rent)
+
+    return df_with_rent_and_cost
+
+
 def rentcast_data_parser(datetime=None):
     # Use json_to_df to parse rentcast data for initial desired inputs. Returns dict subset.
     df = json_to_df("rentcast", datetime)
@@ -81,6 +92,7 @@ def add_costs_to_parsed_rentcast_data(parsed_data):
     return parsed_data
 
 
-property_df = rentcast_data_parser("2025-10-10_12-42-27")
-joined_data = add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
-costs_data = add_costs_to_parsed_rentcast_data(joined_data)
+# property_df = rentcast_data_parser("2025-10-10_12-42-27")
+# joined_data = add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
+# costs_data = add_costs_to_parsed_rentcast_data(joined_data)
+print(aggregate_analysis("2025-10-10_12-42-27", "2025-10-22_13-42").head(5))
