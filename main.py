@@ -252,4 +252,5 @@ def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
 # aggregate_analysis(price_df, "value")
 property_df = rentcast_data_parser("2025-10-10_12-42-27")
 # property_df.to_csv("rentcast_test.csv")
-add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
+joined_data = add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
+joined_data.to_csv("join_test.csv")
