@@ -1,9 +1,18 @@
 import pandas as pd
 import glob
 import os
+from enum import StrEnum
+
+class ExpectedAPIs(StrEnum):
+    RENTCAST = "rentcast"
+    RENTOMETER = "rentometer"
+    PROPERTY_AGG_ANALYSIS = "property_aggregate_analysis"
 
 
 def json_to_df(api=None, datetime=None):
+    if api and api not in [ExpectedAPIs.RENTCAST, ExpectedAPIs.RENTOMETER, ExpectedAPIs.PROPERTY_AGG_ANALYSIS]:
+        raise Exception("Error: acceptable name strings are 'rentcast', 'rentometer', and 'property_aggregate_analysis'.")
+
     if not api and not datetime:
         files = glob.glob("*.json")
 

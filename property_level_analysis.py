@@ -9,7 +9,7 @@ class ExpectedColumns(StrEnum):
     PROPERTY_TAX = "property_tax"
 
 
-def aggregate_analysis(rentcast_datetime_string=None, rentometer_datetime_string=None):
+def property_aggregate_analysis(rentcast_datetime_string=None, rentometer_datetime_string=None):
     # Parses Rentcast data in JSON dumps by datetime and incorporates Rentometer rent data and costs.
     df = rentcast_data_parser(rentcast_datetime_string)
 
@@ -92,7 +92,23 @@ def add_costs_to_parsed_rentcast_data(parsed_data):
     return parsed_data
 
 
+def property_analysis_to_json(aggregate_data):
+    name_string = "property_aggregate_analysis"
+    datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_name = f"{name_string}_{datetime_string}.json"
+    aggregate_data.to_json(output_name, orient="columns", indent=4)
+
+
+def find_address_in_property_analysis_json(address_string, datetime_string=None):
+    df = json_to_df("property_aggregate_analysis", datetime_string)
+    subset_df = df[df["address"].str.contains(address_string, case=False, na=False)]
+    return subset_df
+
+
 # property_df = rentcast_data_parser("2025-10-10_12-42-27")
 # joined_data = add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
 # costs_data = add_costs_to_parsed_rentcast_data(joined_data)
-print(aggregate_analysis("2025-10-10_12-42-27", "2025-10-22_13-42").head(5))
+# df = property_aggregate_analysis("2025-10-10_12-42-27", "2025-10-22_13-42")
+# property_analysis_to_json(df)
+# subset_df = find_address_in_property_analysis_json("7236 S Bell St", "2025-10-28")
+# subset_df.to_csv("test_find_address.csv")

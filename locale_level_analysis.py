@@ -14,7 +14,7 @@ class ExpectedColumns(StrEnum):
     VALUE = "Value"
     ANNUAL_GROWTH_BY_ZIP = "Annual_Growth_By_Zip"
 
-def aggregate_analysis(df, metric):
+def locale_aggregate_analysis(df, metric):
     """Core functionality for Project Falcon #1: based on aggregate rental market index, identify
     1) Annualized % growth (average and median) aggregated for 1a) county and 1b) state,
     2) Absolute index value IQR today by county, and

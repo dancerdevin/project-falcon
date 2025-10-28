@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 from geopy.geocoders import Nominatim
 import math
-import urllib.parse
 
 
 load_dotenv() # Load API keys
