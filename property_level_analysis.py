@@ -17,7 +17,9 @@ def property_aggregate_analysis(rentcast_datetime_string=None, rentometer_dateti
 
     df_with_rent_and_cost = add_costs_to_parsed_rentcast_data(df_with_rent)
 
-    return df_with_rent_and_cost
+    df_complete = aggregated_property_data_calc(df_with_rent_and_cost)
+
+    return df_complete
 
 
 def rentcast_data_parser(datetime=None):
@@ -59,7 +61,8 @@ def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
 
     # Load JSON dumps saved to disk from relevant datetime (right before making API calls) and concatenate into dataframe.
     rent_data = json_to_df("rentometer", datetime_string)
-    subset_rent_data = rent_data[["address", "mean", "median", "min", "max"]].reset_index(drop=True)
+    subset_rent_data = rent_data[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
+    subset_rent_data = subset_rent_data.rename(columns={"quickview_url": "rentometer_url"})
     subset_rent_data = subset_rent_data.drop_duplicates()
 
     # Match addresses between parsed_data and new Rentometer JSON dumps, add Rentometer data, and return.
@@ -92,11 +95,17 @@ def add_costs_to_parsed_rentcast_data(parsed_data):
     return parsed_data
 
 
-def property_analysis_to_json(aggregate_data):
+def aggregated_property_data_calc(agg_data):
+    agg_data["cost_per_sf_house"] = agg_data["value"] / agg_data["squareFootage"]
+    agg_data["cost_per_sf_land"] = agg_data["value"] / agg_data["lotSize"]
+    # TODO: Incorporate deductions.
+
+
+def property_analysis_to_json(agg_data):
     name_string = "property_aggregate_analysis"
     datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_name = f"{name_string}_{datetime_string}.json"
-    aggregate_data.to_json(output_name, orient="columns", indent=4)
+    agg_data.to_json(output_name, orient="columns", indent=4)
 
 
 def find_address_in_property_analysis_json(address_string, datetime_string=None):
