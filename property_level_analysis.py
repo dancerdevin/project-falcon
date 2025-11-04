@@ -1,6 +1,7 @@
 import pandas as pd
+import numpy as np
 from enum import StrEnum
-from json_to_df import json_to_df
+from json_loading import json_to_df, json_to_list_of_dicts
 from property_data import rentometer_api
 from datetime import datetime
 from amortization.amount import calculate_amortization_amount
@@ -98,7 +99,6 @@ def add_costs_to_parsed_rentcast_data(parsed_data):
 def aggregated_property_data_calc(agg_data):
     agg_data["cost_per_sf_house"] = agg_data["value"] / agg_data["squareFootage"]
     agg_data["cost_per_sf_land"] = agg_data["value"] / agg_data["lotSize"]
-    # TODO: Incorporate deductions.
 
 
 def property_analysis_to_json(agg_data):
@@ -114,6 +114,41 @@ def find_address_in_property_analysis_json(address_string, datetime_string=None)
     return subset_df
 
 
+def address_data_to_gsheet(address_string, datetime_string=None):
+    list_of_dicts = json_to_list_of_dicts("property_aggregate_analysis", datetime_string)
+    address_match_dict = {}
+    dict_index_match = None
+    for i in range(len(list_of_dicts)):
+        # Check all the aggregate analyses in the list of JSON dumps.
+        for key, indices in list_of_dicts[i].items():
+            if key == "address":
+                # Focus on the address field in each dict in the list.
+                for index_key, value in indices.items():
+                    if address_string in value:
+                        # Match found in a dict. Now hone in on the specific address data row with the index_key.
+                        print("Address match found.")
+                        dict_index_match = i
+                        index_key_match = index_key
+                        break
+    
+    if dict_index_match is not None:
+        # Having found an address match, loop again and get all information pertaining to that address.
+        for column_name, value_dicts in list_of_dicts[dict_index_match].items():
+            for key, value in value_dicts.items():
+                if key == index_key_match:
+                    address_match_dict[column_name] = value
+    
+    if address_match_dict:
+        # Remove all values that are dictionaries for clean-up and Gsheet compatability.
+        for key, value in list(address_match_dict.items()):
+            if isinstance(value, dict):
+                del address_match_dict[key]
+        return address_match_dict
+    else:
+        raise Exception("Error: no match found for address string in specified JSON files.")
+
+
+
 # property_df = rentcast_data_parser("2025-10-10_12-42-27")
 # joined_data = add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
 # costs_data = add_costs_to_parsed_rentcast_data(joined_data)
@@ -121,3 +156,5 @@ def find_address_in_property_analysis_json(address_string, datetime_string=None)
 # property_analysis_to_json(df)
 # subset_df = find_address_in_property_analysis_json("7236 S Bell St", "2025-10-28")
 # subset_df.to_csv("test_find_address.csv")
+# address_match = address_data_to_gsheet("7236 S Bell St", "2025-10-28")
+# print(address_match)
