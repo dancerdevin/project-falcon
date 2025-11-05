@@ -41,7 +41,7 @@ def main():
 
   sheet_body = {
     "properties": {
-      "title": "Test Spreadsheet"
+      "title": "BatchUpdate Test Spreadsheet"
     },
     "sheets": [
       {
@@ -75,20 +75,20 @@ def main():
       first_row_values_list
     ]
 
-    range_string = "Test Sheet!A1:AZ3"
-
-    value_range = {
-      "values": values
+    value_ranges = {
+      "valueInputOption": "RAW",
+      "data": [
+        {
+        "range": "Test Sheet!A1:AZ3",
+        "values": values
+        }
+      ]
     }
 
-    result = service.spreadsheets().values().update(
+    result = service.spreadsheets().values().batchUpdate(
       spreadsheetId = spreadsheet_id,
-      range = range_string,
-      valueInputOption = "RAW",
-      body = value_range
+      body = value_ranges
     ).execute()
-
-    print(f"{result.get('updatedCells')} cells updated.")
 
 
   except HttpError as err:
