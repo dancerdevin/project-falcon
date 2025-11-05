@@ -39,14 +39,17 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
+  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors"
+  sheet_one_title = "Test Sheet"
+
   sheet_body = {
     "properties": {
-      "title": "BatchUpdate Test Spreadsheet"
+      "title": spreadsheet_title
     },
     "sheets": [
       {
         "properties": {
-          "title": "Test Sheet"
+          "title": sheet_one_title
         }
       }
     ]
@@ -55,15 +58,16 @@ def main():
   try:
     service = build("sheets", "v4", credentials=creds)
 
-    # Call the Sheets API
-    sheet = service.spreadsheets().create(body=sheet_body).execute()
+    # Create spreadsheet
+    spreadsheet = service.spreadsheets().create(body=sheet_body).execute()
 
-    print(f"Spreadsheet created: {sheet.get("spreadsheetUrl")}")
+    print(f"Spreadsheet created: {spreadsheet.get("spreadsheetUrl")}")
 
-    spreadsheet_id = sheet.get("spreadsheetId")
+    spreadsheet_id = spreadsheet.get("spreadsheetId")
 
     address_dict = address_data_to_gsheet(address_string, datetime_string)
 
+    # Populate spreadsheet with values using spreadsheet.values().batchUpdate()
     column_list = []
     first_row_values_list = []
     for key, value in address_dict.items():
@@ -75,20 +79,59 @@ def main():
       first_row_values_list
     ]
 
-    value_ranges = {
+    values_body = {
       "valueInputOption": "RAW",
       "data": [
         {
-        "range": "Test Sheet!A1:AZ3",
+        "range": sheet_one_title + "!A1:AZ3",
         "values": values
         }
       ]
     }
 
-    result = service.spreadsheets().values().batchUpdate(
+    service.spreadsheets().values().batchUpdate(
       spreadsheetId = spreadsheet_id,
-      body = value_ranges
+      body = values_body
     ).execute()
+    print("spreadsheets.values.batchUpdate executed.")
+
+    # Format spreadsheet using spreadsheet.batchUpdate(). First get sheet ID
+    sheet_id = None
+    
+    for sheet in spreadsheet["sheets"]:
+      if sheet["properties"]["title"] == sheet_one_title:
+        sheet_id = sheet["properties"]["sheetId"]
+    if sheet_id is None:
+      raise Exception("Error: No match with sheet title found.")
+
+    format_body = {
+      "requests": [
+        {
+          "repeatCell": {
+            "range": {
+              "sheetId": sheet_id,
+              "startRowIndex": 0,
+              "endRowIndex": 1
+            },
+            "cell": {
+              "userEnteredFormat": {
+                "backgroundColor": {"green": 1},
+                "textFormat": {
+                  "foregroundColor": {"blue": 1}
+                }
+              }
+            },
+            "fields": "userEnteredFormat(backgroundColor,textFormat.foregroundColor)"
+          },
+        }
+      ]
+    }
+
+    service.spreadsheets().batchUpdate(
+      spreadsheetId = spreadsheet_id,
+      body = format_body
+    ).execute()
+    print("spreadsheets.batchUpdate executed.")
 
 
   except HttpError as err:
