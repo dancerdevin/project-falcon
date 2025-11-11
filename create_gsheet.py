@@ -39,7 +39,7 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors DYNAMIC TEST"
+  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors CLEANED"
   sheet_one_title = "Test Sheet"
 
   sheet_body = {

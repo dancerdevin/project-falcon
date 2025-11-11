@@ -96,6 +96,19 @@ def add_costs_to_parsed_rentcast_data(parsed_data):
     return parsed_data
 
 
+def clean_aggregated_property_data(list_of_dicts, index_key_match):
+    """Remove fields unnecessary for or incompatible with (i.e., dictionaries) populating Google Sheet."""
+    address_match_dict = {}
+    columns_to_remove = ["id", "address", "addressLine2", "stateFips", "countyFips", "features", "taxAssessments", "propertyTaxes", "history", "owner"]
+    for column_name, value_dicts in list_of_dicts.items():
+            for key, value in value_dicts.items():
+                if key == index_key_match:
+                    if column_name not in columns_to_remove:
+                        address_match_dict[column_name] = value
+
+    return address_match_dict
+
+
 def aggregated_property_data_calc(agg_data):
     agg_data["cost_per_sf_house"] = agg_data["value"] / agg_data["squareFootage"]
     agg_data["cost_per_sf_land"] = agg_data["value"] / agg_data["lotSize"]
@@ -116,7 +129,6 @@ def find_address_in_property_analysis_json(address_string, datetime_string=None)
 
 def address_data_to_gsheet(address_string, datetime_string=None):
     list_of_dicts = json_to_list_of_dicts("property_aggregate_analysis", datetime_string)
-    address_match_dict = {}
     dict_index_match = None
     for i in range(len(list_of_dicts)):
         # Check all the aggregate analyses in the list of JSON dumps.
@@ -132,17 +144,10 @@ def address_data_to_gsheet(address_string, datetime_string=None):
                         break
     
     if dict_index_match is not None:
-        # Having found an address match, loop again and get all information pertaining to that address.
-        for column_name, value_dicts in list_of_dicts[dict_index_match].items():
-            for key, value in value_dicts.items():
-                if key == index_key_match:
-                    address_match_dict[column_name] = value
+        # Having found an address match, clean and get all information pertaining to that address.
+        address_match_dict = clean_aggregated_property_data(list_of_dicts[dict_index_match], index_key_match)
     
     if address_match_dict:
-        # Remove all values that are dictionaries for clean-up and Gsheet compatability.
-        for key, value in list(address_match_dict.items()):
-            if isinstance(value, dict):
-                del address_match_dict[key]
         return address_match_dict
     else:
         raise Exception("Error: no match found for address string in specified JSON files.")
