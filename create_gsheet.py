@@ -39,7 +39,7 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors SORTED V1"
+  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors SORTED V2.3"
   sheet_one_title = "Test Sheet"
 
   sheet_body = {
@@ -68,7 +68,7 @@ def main():
     address_dict = address_data_to_gsheet(address_string, datetime_string)
 
     # Populate spreadsheet with values using spreadsheet.values().batchUpdate()
-    categories = ["Location", "Features", "Values", "Metadata"]
+    categories = ["Location", "", "", "Features", "", "", "Values", "", "", "Metadata"]
     location_keys = ["addressLine1", "city", "state", "zipCode", "county", "latitude", "longitude"]
     features_keys = ["propertyType", "bedrooms", "bathrooms", "squareFootage", "lotSize", "yearBuilt", "zoning", "garage", "heatingType"]
     values_keys = ["lastSalePrice", "ownerOccupied", "value", "propertyTax", "mean", "median", "min", "max", "mortgage", "insurance", "monthly_tax", "capex", "management", "sum_costs"]
@@ -80,20 +80,21 @@ def main():
 
     # Dynamically map ranges and values to body data
     ranges = [
-      (sheet_one_title + "!A1:AZ1", list(location_dict.keys())),
-      (sheet_one_title + "!A2:AZ2", list(location_dict.values())),
-      (sheet_one_title + "!A3:AZ3", list(features_dict.keys())),
-      (sheet_one_title + "!A4:AZ4", list(features_dict.values())),
-      (sheet_one_title + "!A5:AZ5", list(values_dict.keys())),
-      (sheet_one_title + "!A6:AZ6", list(values_dict.values())),
-      (sheet_one_title + "!A7:AZ7", list(metadata_dict.keys())),
-      (sheet_one_title + "!A8:AZ8", list(metadata_dict.values()))
+      (sheet_one_title + "!B1:1", categories, "ROWS"),
+      (sheet_one_title + "!A2:A", list(location_dict.keys()), "COLUMNS"),
+      (sheet_one_title + "!B2:B", list(location_dict.values()), "COLUMNS"),
+      (sheet_one_title + "!D2:D", list(features_dict.keys()), "COLUMNS"),
+      (sheet_one_title + "!E2:E", list(features_dict.values()), "COLUMNS"),
+      (sheet_one_title + "!G2:G", list(values_dict.keys()), "COLUMNS"),
+      (sheet_one_title + "!H2:H", list(values_dict.values()), "COLUMNS"),
+      (sheet_one_title + "!J2:J", list(metadata_dict.keys()), "COLUMNS"),
+      (sheet_one_title + "!K2:K", list(metadata_dict.values()), "COLUMNS")
     ]
 
     values_body = {
       "valueInputOption": "RAW",
       "data": [
-        {"range": range, "values": [values]} for range, values in ranges
+        {"range": range, "values": [values], "majorDimension": majorDimension} for range, values, majorDimension in ranges
       ]
     }
 
