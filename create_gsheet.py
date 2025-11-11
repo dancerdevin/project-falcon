@@ -39,7 +39,7 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors CLEANED"
+  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors SORTED V1"
   sheet_one_title = "Test Sheet"
 
   sheet_body = {
@@ -68,16 +68,26 @@ def main():
     address_dict = address_data_to_gsheet(address_string, datetime_string)
 
     # Populate spreadsheet with values using spreadsheet.values().batchUpdate()
-    column_list = []
-    first_row_values_list = []
-    for key, value in address_dict.items():
-      column_list.append(key)
-      first_row_values_list.append(value)
+    categories = ["Location", "Features", "Values", "Metadata"]
+    location_keys = ["addressLine1", "city", "state", "zipCode", "county", "latitude", "longitude"]
+    features_keys = ["propertyType", "bedrooms", "bathrooms", "squareFootage", "lotSize", "yearBuilt", "zoning", "garage", "heatingType"]
+    values_keys = ["lastSalePrice", "ownerOccupied", "value", "propertyTax", "mean", "median", "min", "max", "mortgage", "insurance", "monthly_tax", "capex", "management", "sum_costs"]
+    metadata_keys = ["assessorID", "legalDescription", "lastSaleDate", "filename"]
+    location_dict = {key: address_dict[key] for key in location_keys if key in address_dict}
+    features_dict = {key: address_dict[key] for key in features_keys if key in address_dict}
+    values_dict = {key: address_dict[key] for key in values_keys if key in address_dict}
+    metadata_dict = {key: address_dict[key] for key in metadata_keys if key in address_dict}
 
     # Dynamically map ranges and values to body data
     ranges = [
-      (sheet_one_title + "!A1:AZ1", column_list),
-      (sheet_one_title + "!A2:AZ2", first_row_values_list)
+      (sheet_one_title + "!A1:AZ1", list(location_dict.keys())),
+      (sheet_one_title + "!A2:AZ2", list(location_dict.values())),
+      (sheet_one_title + "!A3:AZ3", list(features_dict.keys())),
+      (sheet_one_title + "!A4:AZ4", list(features_dict.values())),
+      (sheet_one_title + "!A5:AZ5", list(values_dict.keys())),
+      (sheet_one_title + "!A6:AZ6", list(values_dict.values())),
+      (sheet_one_title + "!A7:AZ7", list(metadata_dict.keys())),
+      (sheet_one_title + "!A8:AZ8", list(metadata_dict.values()))
     ]
 
     values_body = {
