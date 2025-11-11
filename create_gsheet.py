@@ -39,7 +39,7 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors"
+  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors DYNAMIC TEST"
   sheet_one_title = "Test Sheet"
 
   sheet_body = {
@@ -74,18 +74,16 @@ def main():
       column_list.append(key)
       first_row_values_list.append(value)
 
-    values = [
-      column_list,
-      first_row_values_list
+    # Dynamically map ranges and values to body data
+    ranges = [
+      (sheet_one_title + "!A1:AZ1", column_list),
+      (sheet_one_title + "!A2:AZ2", first_row_values_list)
     ]
 
     values_body = {
       "valueInputOption": "RAW",
       "data": [
-        {
-        "range": sheet_one_title + "!A1:AZ3",
-        "values": values
-        }
+        {"range": range, "values": [values]} for range, values in ranges
       ]
     }
 
