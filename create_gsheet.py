@@ -61,9 +61,7 @@ def repeat_cell_builder(sheet_id, start_row, end_row, start_col, end_col, **kwar
 
 
 def main():
-  """Shows basic usage of the Sheets API.
-  Prints values from a sample spreadsheet.
-  """
+  """Generate Google Sheet from aggregate data on a single property."""
   creds = None
   # The file token.json stores the user's access and refresh tokens, and is
   # created automatically when the authorization flow completes for the first
@@ -83,7 +81,7 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors SORTED V3"
+  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors SORTED V3.3"
   sheet_one_title = "Test Sheet"
 
   sheet_body = {
@@ -160,12 +158,42 @@ def main():
     # Dynamically map ranges, formatting, and fields to format requests
     format_specs = [
       {
-          "range": (0, 1, 1, len(categories) + 1),
+          "range": (0, 1, 1, 2),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1},
+      },
+      {
+          "range": (0, 1, 4, 5),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1},
+      },
+      {
+          "range": (0, 1, 7, 8),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1},
+      },
+      {
+          "range": (0, 1, 10, 11),
           FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1},
       },
       {
           "range": (1, len(location_keys) + 1, 0, 1),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
+      },
+      {
+          "range": (1, len(features_keys) + 1, 3, 4),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
+      },
+      {
+          "range": (1, len(values_keys) + 1, 6, 7),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
+      },
+      {
+          "range": (1, len(metadata_keys) + 1, 9, 10),
           FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
       }
