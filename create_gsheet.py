@@ -5,7 +5,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
+from enum import StrEnum
 from property_level_analysis import address_data_to_gsheet
 
 
@@ -14,6 +14,50 @@ datetime_string = "2025-10-28"
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+
+class FormatKwargs(StrEnum):
+  """Expected kwargs for formatting updates using repeat_cell_builder()."""
+  BG_COLOR = "bg_color"
+  TEXT_COLOR = "text_color"
+
+
+def repeat_cell_builder(sheet_id, start_row, end_row, start_col, end_col, **kwargs):
+  """Formatting requests in the Google Sheets API involve many complex nested arrays.
+  This helper function unpacks specifications to fit the necessary structure."""
+
+  repeat_cell = {
+    "repeatCell": {
+      "range": {
+        "sheetId": sheet_id,
+        "startRowIndex": start_row,
+        "endRowIndex": end_row,
+        "startColumnIndex": start_col,
+        "endColumnIndex": end_col
+      },
+      "cell": {"userEnteredFormat": {}},
+      "fields": "userEnteredFormat"
+    }
+  }
+
+  user_format_dict = repeat_cell["repeatCell"]["cell"]["userEnteredFormat"]
+  fields = []
+
+  # Check for dictionaries with kwargs
+  if FormatKwargs.BG_COLOR in kwargs:
+    user_format_dict["backgroundColor"] = kwargs["bg_color"]
+    fields.append("backgroundColor")
+  
+  if FormatKwargs.TEXT_COLOR in kwargs:
+    if "textFormat" not in user_format_dict:
+      user_format_dict["textFormat"] = {}
+    user_format_dict["textFormat"]["foregroundColor"] = kwargs["text_color"]
+    fields.append("textFormat.foregroundColor")
+  
+  # Join fields list into required fields string
+  repeat_cell["repeatCell"]["fields"] = "userEnteredFormat(" + ",".join(fields) + ")"
+
+  return repeat_cell
 
 
 def main():
@@ -39,7 +83,7 @@ def main():
     with open("token.json", "w") as token:
       token.write(creds.to_json())
 
-  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors SORTED V2.3"
+  spreadsheet_title = "BatchUpdate Test Spreadsheet with Colors SORTED V3"
   sheet_one_title = "Test Sheet"
 
   sheet_body = {
@@ -78,7 +122,7 @@ def main():
     values_dict = {key: address_dict[key] for key in values_keys if key in address_dict}
     metadata_dict = {key: address_dict[key] for key in metadata_keys if key in address_dict}
 
-    # Dynamically map ranges and values to body data
+    # Dynamically map ranges and values to body data, maintaining key-value parallelism with dicts
     ranges = [
       (sheet_one_title + "!B1:1", categories, "ROWS"),
       (sheet_one_title + "!A2:A", list(location_dict.keys()), "COLUMNS"),
@@ -113,26 +157,24 @@ def main():
     if sheet_id is None:
       raise Exception("Error: No match with sheet title found.")
 
+    # Dynamically map ranges, formatting, and fields to format requests
+    format_specs = [
+      {
+          "range": (0, 1, 1, len(categories) + 1),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1},
+      },
+      {
+          "range": (1, len(location_keys) + 1, 0, 1),
+          FormatKwargs.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
+          FormatKwargs.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
+      }
+    ]
+
+    # start_row, end_row, start_col, end_col are unpacked from "range" tuple; dicts like bg_color are unpacked as kwargs.
     format_body = {
       "requests": [
-        {
-          "repeatCell": {
-            "range": {
-              "sheetId": sheet_id,
-              "startRowIndex": 0,
-              "endRowIndex": 1
-            },
-            "cell": {
-              "userEnteredFormat": {
-                "backgroundColor": {"green": 1},
-                "textFormat": {
-                  "foregroundColor": {"blue": 1}
-                }
-              }
-            },
-            "fields": "userEnteredFormat(backgroundColor,textFormat.foregroundColor)"
-          },
-        }
+        repeat_cell_builder(sheet_id, *spec["range"], **spec) for spec in format_specs
       ]
     }
 
