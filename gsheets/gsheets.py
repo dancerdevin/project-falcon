@@ -17,6 +17,10 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 API_NAME = "sheets"
 API_VERSION = "v4"
 
+# Spreadsheet constants, e.g., title
+SPREADSHEET_TITLE = "Post Refactor Values and Format Test"
+SHEET_ONE_TITLE = "Test Sheet"
+
 
 class GoogleSheetsAPIClient:
   """Generate Google Sheet from aggregate data on a single property."""
@@ -71,7 +75,7 @@ class GoogleSheet:
         "sheets": [
           {
             "properties": {
-            "title": sheet_one_title
+              "title": sheet_one_title
             }
           }
         ]
@@ -81,5 +85,3 @@ class GoogleSheet:
     self.spreadsheet = self.client.spreadsheets().create(body=self.sheet_body).execute()
 
     print(f"Spreadsheet created: {self.spreadsheet.get("spreadsheetUrl")}")
-
-    spreadsheet_id = self.spreadsheet.get("spreadsheetId")

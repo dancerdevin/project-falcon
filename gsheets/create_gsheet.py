@@ -1,7 +1,8 @@
 import os
 import sys
 # from property_gsheets import repeat_cell_builder
-from gsheets import GoogleSheetsAPIClient, GoogleSheet
+from gsheets import GoogleSheetsAPIClient, GoogleSheet, SPREADSHEET_TITLE, SHEET_ONE_TITLE
+from property_gsheets import PropertySpreadsheet
 
 
 # Locate parent directory to import property data scripts
@@ -15,15 +16,14 @@ from property_level_analysis import address_data_to_gsheet
 ADDRESS_STRING = "7236 S Bell St"
 DATETIME_STRING = "2025-10-28"
 
-# Spreadsheet constants, e.g., title
-SPREADSHEET_TITLE = "Post Refactor Empty Test"
-SHEET_ONE_TITLE = "Test Sheet"
-
 
 def main():
   address_dict = address_data_to_gsheet(ADDRESS_STRING, DATETIME_STRING)
   client = GoogleSheetsAPIClient()
   gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
+  property_gsheet = PropertySpreadsheet(address_dict, gsheet)
+  property_gsheet.update_values()
+  property_gsheet.update_format()
 
 
 if __name__ == "__main__":
