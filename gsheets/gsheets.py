@@ -18,7 +18,7 @@ API_NAME = "sheets"
 API_VERSION = "v4"
 
 # Spreadsheet constants, e.g., title
-SPREADSHEET_TITLE = "Post Refactor Values and Format Test"
+SPREADSHEET_TITLE = "FormatSpec Test v1.3"
 SHEET_ONE_TITLE = "Test Sheet"
 
 
