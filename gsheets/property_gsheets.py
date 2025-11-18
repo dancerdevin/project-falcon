@@ -17,13 +17,18 @@ class ValueData:
     self.values = values
     self.major_dimension = major_dimension
 
+class GridRange:
+  """Ranges to update formatting, in int format."""
+  def __init__(self, start_row, end_row, start_col, end_col):
+    self.start_row = start_row
+    self.end_row = end_row
+    self.start_col = start_col
+    self.end_col = end_col
+
 class FormatSpec:
   """Data required to update format includes cell range in a tuple of ints and FormatKwargs."""
-  def __init__(self, *args, **kwargs):
-    self.range = args
-    # for kwarg in kwargs:
-    #   if not isinstance(kwarg, FormatKwarg):
-    #     raise Exception("Error in FormatSpec init: keyword not recognized as valid FormatKwarg.")
+  def __init__(self, grid_range, **kwargs):
+    self.grid_range = grid_range
     self.kwargs = kwargs
 
 
@@ -57,49 +62,49 @@ class PropertySpreadsheet:
   ]
     
     self.format_specs = [
-      FormatSpec(*(0, 1, 1, 2), 
+      FormatSpec(GridRange(0, 1, 1, 2), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(*(0, 1, 4, 5), 
+      FormatSpec(GridRange(0, 1, 4, 5), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(*(0, 1, 7, 8), 
+      FormatSpec(GridRange(0, 1, 7, 8), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(*(0, 1, 10, 11), 
+      FormatSpec(GridRange(0, 1, 10, 11), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(*(1, len(LOCATION_KEYS) + 1, 0, 1), 
+      FormatSpec(GridRange(1, len(LOCATION_KEYS) + 1, 0, 1), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(*(1, len(FEATURES_KEYS) + 1, 3, 4), 
+      FormatSpec(GridRange(1, len(FEATURES_KEYS) + 1, 3, 4), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(*(1, len(VALUES_KEYS) + 1, 6, 7), 
+      FormatSpec(GridRange(1, len(VALUES_KEYS) + 1, 6, 7), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(*(1, len(METADATA_KEYS) + 1, 9, 10), 
+      FormatSpec(GridRange(1, len(METADATA_KEYS) + 1, 9, 10), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
@@ -128,17 +133,17 @@ class PropertySpreadsheet:
     """Formatting requests in the Google Sheets API involve many complex nested arrays.
     This helper function unpacks specifications to fit the necessary structure."""
 
-    start_row, end_row, start_col, end_col = format_spec.range
+    grid_range = format_spec.grid_range
     kwargs = format_spec.kwargs
     
     repeat_cell = {
       "repeatCell": {
         "range": {
           "sheetId": sheet_id,
-          "startRowIndex": start_row,
-          "endRowIndex": end_row,
-          "startColumnIndex": start_col,
-          "endColumnIndex": end_col
+          "startRowIndex": grid_range.start_row,
+          "endRowIndex": grid_range.end_row,
+          "startColumnIndex": grid_range.start_col,
+          "endColumnIndex": grid_range.end_col
         },
         "cell": {"userEnteredFormat": {}},
         "fields": "userEnteredFormat"
