@@ -1,0 +1,2 @@
+# TODO: create Spreadsheet class to hold format information and take data like Property objects (or Locale objects?)
+# TODO: functionality to interface with json files using json_loading.py that can be swapped out for a future database

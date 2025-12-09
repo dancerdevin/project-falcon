@@ -4,6 +4,8 @@ from gsheets import SHEET_ONE_TITLE
 Populate Google Sheet object with property data by updating values and formatting.
 """
 
+# TODO: refactor to receive a Spreadsheet object with Property object data once those are complete
+# A lot of the data that is stored in this file will end up being stored in a lower layer
 
 class FormatKwarg:
   """Expected kwargs for formatting updates using repeat_cell_builder()."""

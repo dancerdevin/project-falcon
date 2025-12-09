@@ -11,6 +11,8 @@ import math
 load_dotenv() # Load API keys
 geolocator = Nominatim(user_agent="peregrin_app") # Instantiate address-finder
 
+# TODO: Property class with data for property_level_analysis.py (init, str, repr) [now in property_schema.py]
+# TODO: Locale class?
 
 def lat_long_from_zip(zip_code):
     # Return central latitude and longitude for a given ZIP code, for use in API calls.

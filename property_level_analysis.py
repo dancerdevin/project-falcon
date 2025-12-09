@@ -6,6 +6,8 @@ from property_data import rentometer_api
 from datetime import datetime
 from amortization.amount import calculate_amortization_amount
 
+# TODO: use Property objects instead of address_dict, once those are defined in property_data
+
 class ExpectedColumns(StrEnum):
     PROPERTY_TAX = "property_tax"
 
@@ -161,5 +163,5 @@ def address_data_to_gsheet(address_string, datetime_string=None):
 # property_analysis_to_json(df)
 # subset_df = find_address_in_property_analysis_json("7236 S Bell St", "2025-10-28")
 # subset_df.to_csv("test_find_address.csv")
-# address_match = address_data_to_gsheet("7236 S Bell St", "2025-10-28")
-# print(address_match)
+address_match = address_data_to_gsheet("7236 S Bell St", "2025-10-28")
+print(address_match)
