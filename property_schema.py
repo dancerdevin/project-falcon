@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 # TODO: route data intake (from Rentcast and Rentometer) into Property objects
+# Next time: review what data is coming from where, what sort of dict results, and refactor to parse into Details objects.
+# A Property object will be instantiated from Details presumably instantiated at different stages, e.g., analysis -> ValueDetails.
 # TODO: design Spreadsheet objects similarly to provide formatting information to API clients
 # TODO: design API Client abstract base class to expect PropertyBundles and SpreadsheetBundles
 # TODO: scour the details of the refactored Gsheet plug-in to, e.g., receive Property data bundled as dicts and not "address_dict"
@@ -14,8 +16,8 @@ class LocationDetails:
     state: str
     zip_code: int
     county: str
-    latitude: float
-    longitude: float
+    latitude: float | None
+    longitude: float | None
 
 
 @dataclass
@@ -57,6 +59,8 @@ class ValueDetails:
 @dataclass    
 class Metadata:
     filename: str
+    rentometer_url: str | None
+    rentcast_url: str | None
 
 
 @dataclass

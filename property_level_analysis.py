@@ -2,30 +2,112 @@ import pandas as pd
 import numpy as np
 from enum import StrEnum
 from json_loading import json_to_df, json_to_list_of_dicts
-from property_data import rentometer_api
+from property_data_intake import rentometer_api
 from datetime import datetime
 from amortization.amount import calculate_amortization_amount
+from property_schema import Property, LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, Metadata
 
 # TODO: use Property objects instead of address_dict, once those are defined in property_data
+
+LOAN_TO_VALUE = .7
+APR = 0.07
+AMORT_MONTHS = 360
+EST_YEARLY_INSURANCE = 1000
 
 class ExpectedColumns(StrEnum):
     PROPERTY_TAX = "property_tax"
 
 
-def property_aggregate_analysis(rentcast_datetime_string=None, rentometer_datetime_string=None):
-    # Parses Rentcast data in JSON dumps by datetime and incorporates Rentometer rent data and costs.
-    df = rentcast_data_parser(rentcast_datetime_string)
+def build_property(rentcast_datetime_string=None, rentometer_datetime_string=None) -> Property:
+    """Assemble Property from LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, and Metadata objects."""
+    # NOTE: One function assembling each sub-object seems intuitive, but will that be possible? Or necessary?
+    df = parse_rentcast_data(rentcast_datetime_string)
 
+    # Aggregate Rentometer data into Rentcast data.
     df_with_rent = add_rent_to_parsed_rentcast_data(df, rentometer_datetime_string)
 
-    df_with_rent_and_cost = add_costs_to_parsed_rentcast_data(df_with_rent)
+    location_details = build_location(df_with_rent)
+    feature_details = build_features(df_with_rent)
+    attribute_details = build_attributes(df_with_rent)
+    value_details = build_values(df_with_rent)
+    metadata = build_metadata(df_with_rent)
 
-    df_complete = aggregated_property_data_calc(df_with_rent_and_cost)
-
-    return df_complete
+    return Property(location_details, feature_details, attribute_details, value_details, metadata)
 
 
-def rentcast_data_parser(datetime=None):
+def build_location(df) -> LocationDetails:
+    # NOTE: Right now, each of these values is a Pandas Series.
+    return LocationDetails(
+        street_address = df["address"],
+        city = df["city"],
+        state = df["state"],
+        zip_code = df["zipCode"],
+        county = df["county"],
+        latitude = df["latitude"],
+        longitude = df["longitude"]
+    )
+
+
+def build_features(df) -> FeatureDetails:
+    return FeatureDetails(
+        property_type = df["propertyType"],
+        bedrooms = df["bedrooms"],
+        bathrooms = df["bathrooms"],
+        sqft = df["squareFootage"],
+        lot_size = df["lotSize"]
+    )
+
+
+def build_attributes(df) -> AttributeDetails:
+    return AttributeDetails(
+        year_built = df["yearBuilt"],
+        assessor_ID = df["assessorID"],
+        legal_description = df["legalDescription"],
+        owner_occupied = df["ownerOccupied"]
+    )
+
+
+def build_values(df) -> ValueDetails:
+    mortgage_est = df["value"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
+    
+    insurance_est = pd.Series(EST_YEARLY_INSURANCE / 12, index=df.index)
+
+    monthly_tax_est = df["property_tax"] / 12 # Rentcast data is by year
+
+    # Estimated maintenance/capex: 1% of house value per year, divided by 12 for monthly
+    capex_est = df["value"].apply(lambda x: (x * 0.01) / 12)
+
+    # Estimated management costs: 10% of monthly rent (using median as more robust indicator)
+    mgmt_est = df["median"] * .1
+
+    # Estimated monthly costs, summed
+    sum_est_costs = pd.concat([insurance_est, capex_est, mgmt_est, monthly_tax_est], axis=1).sum(axis=1)
+
+    return ValueDetails(
+        value_est = df["value"],
+        property_tax = df["property_tax"],
+        mean_rent_est = df["mean"],
+        median_rent_est = df["median"],
+        min_rent = df["min"],
+        max_rent = df["max"],
+        mortgage_est = mortgage_est,
+        insurance_est = insurance_est,
+        monthly_tax_est = monthly_tax_est,
+        capex_est = capex_est,
+        mgmt_est = mgmt_est,
+        sum_est_costs = sum_est_costs
+    )
+
+
+def build_metadata(df) -> Metadata:
+    return Metadata(
+        filename = df["filename"],
+        rentometer_url = df["rentometer_url"],
+        rentcast_url = None # TODO: get from API
+    )
+
+
+def parse_rentcast_data(datetime=None):
     # Use json_to_df to parse rentcast data for initial desired inputs. Returns dict subset.
     df = json_to_df("rentcast", datetime)
     max_value = 550000
@@ -72,30 +154,6 @@ def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
     parsed_data = parsed_data.rename(columns={"formattedAddress": "address"})
     joined_data = pd.merge(parsed_data, subset_rent_data, on="address", how="inner") # Presumes exact same address string
     return joined_data
-
-
-def add_costs_to_parsed_rentcast_data(parsed_data):
-    # Estimate costs: mortgage, insurance, taxes, maintenance/capex, property management, vacancy.
-    loan_to_value = .7
-    apr = 0.07
-    amort_months = 360
-    parsed_data["mortgage"] = parsed_data["value"].apply(lambda x: calculate_amortization_amount((x * loan_to_value), apr, amort_months))
-    
-    est_monthly_insurance = 1000 / 12
-    parsed_data["insurance"] = est_monthly_insurance
-
-    # Rentcast's property tax data is by year, so calculating month-by-month in order to sum costs.
-    parsed_data["monthly_tax"] = parsed_data["property_tax"] / 12
-
-    # Estimated maintenance/capex: 1% of house value per year, divided by 12 for monthly
-    parsed_data["capex"] = parsed_data["value"].apply(lambda x: (x * 0.01) / 12)
-
-    # Estimated management costs: 10% of monthly rent (using median as more robust indicator)
-    parsed_data["management"] = parsed_data["median"] * .1
-
-    parsed_data["sum_costs"] = parsed_data[["mortgage", "insurance", "capex", "management", "monthly_tax"]].sum(axis=1)
-
-    return parsed_data
 
 
 def clean_aggregated_property_data(list_of_dicts, index_key_match):
@@ -163,5 +221,10 @@ def address_data_to_gsheet(address_string, datetime_string=None):
 # property_analysis_to_json(df)
 # subset_df = find_address_in_property_analysis_json("7236 S Bell St", "2025-10-28")
 # subset_df.to_csv("test_find_address.csv")
-address_match = address_data_to_gsheet("7236 S Bell St", "2025-10-28")
-print(address_match)
+# address_match = address_data_to_gsheet("7236 S Bell St", "2025-10-28")
+# print(address_match)
+# df = parse_rentcast_data("2025-10-10_12-42-27")
+# df_with_rent = add_rent_to_parsed_rentcast_data(df, "2025-10-22_13-42")
+prop = build_property("2025-10-10_12-42-27", "2025-10-22_13-42")
+print(prop)
+print(prop.values)
