@@ -8,6 +8,9 @@ from typing import Protocol
 # TODO: design API Client abstract base class to expect PropertyBundles and SpreadsheetBundles
 # TODO: scour the details of the refactored Gsheet plug-in to, e.g., receive Property data bundled as dicts and not "address_dict"
 
+# NOTE: Data provider interface: swap from JSON dumps to live API calls without losing past code (maybe I'll want JSON dumps later!)
+# I'll need to study how to hook up both sender and recipient to an interface, but that's what I want to learn.
+
 @dataclass
 class LocationDetails:
     """Subset of Property data relevant to location."""
@@ -61,7 +64,7 @@ class Metadata:
     filename: str
     rentometer_url: str | None
     rentcast_url: str | None
-
+    name: str = "Metadata"
 
 @dataclass
 class Property:
@@ -71,6 +74,7 @@ class Property:
     attributes: AttributeDetails
     values: ValueDetails
     metadata: Metadata
+    COL_NAMES = ("location", "features", "attributes", "values", "metadata") # Hardcoding as class constant for now
 
     def as_bundle(self, bundle):
         """Return only a subset of relevant Property data as a bundle."""

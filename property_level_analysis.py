@@ -7,7 +7,9 @@ from datetime import datetime
 from amortization.amount import calculate_amortization_amount
 from property_schema import Property, LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, Metadata
 
-# TODO: use Property objects instead of address_dict, once those are defined in property_data
+# TODO: currently: unpack list of property objects into dict to send to gsheet output
+# then/or create Spreadsheet object to store formatting information and also plug THAT in
+# TODO: generally, use Property objects instead of address_dict, once those are defined in property_data, and build plug-in for Gsheets
 
 LOAN_TO_VALUE = .7
 APR = 0.07
@@ -18,91 +20,85 @@ class ExpectedColumns(StrEnum):
     PROPERTY_TAX = "property_tax"
 
 
-def build_property(rentcast_datetime_string=None, rentometer_datetime_string=None) -> Property:
-    """Assemble Property from LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, and Metadata objects."""
-    # NOTE: One function assembling each sub-object seems intuitive, but will that be possible? Or necessary?
+def build_properties(rentcast_datetime_string=None, rentometer_datetime_string=None) -> list:
+    """Assemble list of Property objects populated by LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, and Metadata objects."""
     df = parse_rentcast_data(rentcast_datetime_string)
 
     # Aggregate Rentometer data into Rentcast data.
     df_with_rent = add_rent_to_parsed_rentcast_data(df, rentometer_datetime_string)
 
-    location_details = build_location(df_with_rent)
-    feature_details = build_features(df_with_rent)
-    attribute_details = build_attributes(df_with_rent)
-    value_details = build_values(df_with_rent)
-    metadata = build_metadata(df_with_rent)
+    # While data remains in Pandas DataFrame/Series form, perform calculations by column.
+    df_with_rent_and_costs = add_costs_to_parsed_rentcast_data(df_with_rent)
 
-    return Property(location_details, feature_details, attribute_details, value_details, metadata)
+    # Then, use itertuples() to efficiently treat each row as a property by turning them into NamedTuples.
+    prop_list = []
+
+    for row in df_with_rent_and_costs.itertuples(index=False):
+        location_details = build_location(row)
+        feature_details = build_features(row)
+        attribute_details = build_attributes(row)
+        value_details = build_values(row)
+        metadata = build_metadata(row)
+        prop_list.append(Property(location_details, feature_details, attribute_details, value_details, metadata))
+
+    return prop_list
 
 
-def build_location(df) -> LocationDetails:
+def build_location(row) -> LocationDetails:
     # NOTE: Right now, each of these values is a Pandas Series.
+    # What I should likely do is: build_properties(), build_locations(), etc., and at each stage,
+    # return the data for each given property as a group of LocationDetails containing each Series element by index.
     return LocationDetails(
-        street_address = df["address"],
-        city = df["city"],
-        state = df["state"],
-        zip_code = df["zipCode"],
-        county = df["county"],
-        latitude = df["latitude"],
-        longitude = df["longitude"]
+        street_address = row.address,
+        city = row.city,
+        state = row.state,
+        zip_code = row.zipCode,
+        county = row.county,
+        latitude = row.latitude,
+        longitude = row.longitude
     )
 
 
-def build_features(df) -> FeatureDetails:
+def build_features(row) -> FeatureDetails:
     return FeatureDetails(
-        property_type = df["propertyType"],
-        bedrooms = df["bedrooms"],
-        bathrooms = df["bathrooms"],
-        sqft = df["squareFootage"],
-        lot_size = df["lotSize"]
+        property_type = row.propertyType,
+        bedrooms = row.bedrooms,
+        bathrooms = row.bathrooms,
+        sqft = row.squareFootage,
+        lot_size = row.lotSize
     )
 
 
-def build_attributes(df) -> AttributeDetails:
+def build_attributes(row) -> AttributeDetails:
     return AttributeDetails(
-        year_built = df["yearBuilt"],
-        assessor_ID = df["assessorID"],
-        legal_description = df["legalDescription"],
-        owner_occupied = df["ownerOccupied"]
+        year_built = row.yearBuilt,
+        assessor_ID = row.assessorID,
+        legal_description = row.legalDescription,
+        owner_occupied = row.ownerOccupied
     )
 
 
-def build_values(df) -> ValueDetails:
-    mortgage_est = df["value"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
-    
-    insurance_est = pd.Series(EST_YEARLY_INSURANCE / 12, index=df.index)
-
-    monthly_tax_est = df["property_tax"] / 12 # Rentcast data is by year
-
-    # Estimated maintenance/capex: 1% of house value per year, divided by 12 for monthly
-    capex_est = df["value"].apply(lambda x: (x * 0.01) / 12)
-
-    # Estimated management costs: 10% of monthly rent (using median as more robust indicator)
-    mgmt_est = df["median"] * .1
-
-    # Estimated monthly costs, summed
-    sum_est_costs = pd.concat([insurance_est, capex_est, mgmt_est, monthly_tax_est], axis=1).sum(axis=1)
-
+def build_values(row) -> ValueDetails:
     return ValueDetails(
-        value_est = df["value"],
-        property_tax = df["property_tax"],
-        mean_rent_est = df["mean"],
-        median_rent_est = df["median"],
-        min_rent = df["min"],
-        max_rent = df["max"],
-        mortgage_est = mortgage_est,
-        insurance_est = insurance_est,
-        monthly_tax_est = monthly_tax_est,
-        capex_est = capex_est,
-        mgmt_est = mgmt_est,
-        sum_est_costs = sum_est_costs
+        value_est = row.value,
+        property_tax = row.property_tax,
+        mean_rent_est = row.mean,
+        median_rent_est = row.median,
+        min_rent = row.min,
+        max_rent = row.max,
+        mortgage_est = row.mortgage_est,
+        insurance_est = row.insurance_est,
+        monthly_tax_est = row.monthly_tax_est,
+        capex_est = row.capex_est,
+        mgmt_est = row.mgmt_est,
+        sum_est_costs = row.sum_est_costs
     )
 
 
-def build_metadata(df) -> Metadata:
+def build_metadata(row) -> Metadata:
     return Metadata(
-        filename = df["filename"],
-        rentometer_url = df["rentometer_url"],
+        filename = row.filename,
+        rentometer_url = row.rentometer_url,
         rentcast_url = None # TODO: get from API
     )
 
@@ -154,6 +150,25 @@ def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
     parsed_data = parsed_data.rename(columns={"formattedAddress": "address"})
     joined_data = pd.merge(parsed_data, subset_rent_data, on="address", how="inner") # Presumes exact same address string
     return joined_data
+
+
+def add_costs_to_parsed_rentcast_data(df):
+    df["mortgage_est"] = df["value"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
+    
+    df["insurance_est"] = pd.Series(EST_YEARLY_INSURANCE / 12, index=df.index)
+
+    df["monthly_tax_est"] = df["property_tax"] / 12 # Rentcast data is by year
+
+    # Estimated maintenance/capex: 1% of house value per year, divided by 12 for monthly
+    df["capex_est"] = df["value"].apply(lambda x: (x * 0.01) / 12)
+
+    # Estimated management costs: 10% of monthly rent (using median as more robust indicator)
+    df["mgmt_est"] = df["median"] * .1
+
+    # Estimated monthly costs, summed
+    df["sum_est_costs"] = df[["mortgage_est", "insurance_est", "capex_est", "mgmt_est"]].sum(axis=1)
+
+    return df
 
 
 def clean_aggregated_property_data(list_of_dicts, index_key_match):
@@ -225,6 +240,7 @@ def address_data_to_gsheet(address_string, datetime_string=None):
 # print(address_match)
 # df = parse_rentcast_data("2025-10-10_12-42-27")
 # df_with_rent = add_rent_to_parsed_rentcast_data(df, "2025-10-22_13-42")
-prop = build_property("2025-10-10_12-42-27", "2025-10-22_13-42")
-print(prop)
-print(prop.values)
+prop_list = build_properties("2025-10-10_12-42-27", "2025-10-22_13-42")
+# print(prop_list[1])
+# print(prop_list[1].values)
+print(prop_list[1].COL_NAMES)
