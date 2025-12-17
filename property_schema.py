@@ -64,7 +64,7 @@ class Metadata:
     filename: str
     rentometer_url: str | None
     rentcast_url: str | None
-    name: str = "Metadata"
+
 
 @dataclass
 class Property:
@@ -74,7 +74,7 @@ class Property:
     attributes: AttributeDetails
     values: ValueDetails
     metadata: Metadata
-    COL_NAMES = ("location", "features", "attributes", "values", "metadata") # Hardcoding as class constant for now
+    # COL_NAMES = ("location", "features", "attributes", "values", "metadata") # Hardcoding as class constant for now
 
     def as_bundle(self, bundle):
         """Return only a subset of relevant Property data as a bundle."""
@@ -82,30 +82,37 @@ class Property:
     
 
 """Protocol to enable API client manager to type-check that a bundle is being passed. Just one for now."""    
-class NeedsBasicPropertyInfo(Protocol):
-    def extract(self, prop: Property) -> dict: ...
+# class NeedsNestedPropertyInfo(Protocol):
+#     def extract(self, prop: Property) -> tuple[dict, tuple]: ...
 
 
 """Bundles, rather than inheriting from an abstract bundle class, will be structurally typed by what they extract()."""
-class BasicPropertyBundle:
-    def extract(self, prop: Property):
-        return {
+class NestedPropertyBundle:
+  def extract(self, prop: Property):
+      return {
+        "location": {
           "street_address": prop.location.street_address,
           "city": prop.location.city,
           "state": prop.location.state,
           "zip_code": prop.location.zip_code,
           "county": prop.location.county,
           "latitude": prop.location.latitude,
-          "longitude": prop.location.longitude,
+          "longitude": prop.location.longitude
+        },
+        "features": {
           "property_type": prop.features.property_type,
           "bedrooms": prop.features.bedrooms,
           "bathrooms": prop.features.bathrooms,
           "sqft": prop.features.sqft,
-          "lot_size": prop.features.lot_size,
+          "lot_size": prop.features.lot_size
+        },
+        "attributes": {
           "year_built": prop.attributes.year_built,
           "assessor_ID": prop.attributes.assessor_ID,
           "legal_description": prop.attributes.legal_description,
-          "owner_occupied": prop.attributes.owner_occupied,
+          "owner_occupied": prop.attributes.owner_occupied
+        },
+        "values": {
           "value_est": prop.values.value_est,
           "property_tax": prop.values.property_tax,
           "mean_rent_est": prop.values.mean_rent_est,
@@ -117,5 +124,11 @@ class BasicPropertyBundle:
           "monthly_tax_est": prop.values.monthly_tax_est,
           "capex_est": prop.values.capex_est,
           "mgmt_est": prop.values.mgmt_est,
-          "sum_est_costs": prop.values.sum_est_costs
+          "sum_est_costs": prop.values.sum_est_costs   
+        },
+        "metadata": {
+          "filename": prop.metadata.filename,
+          "rentometer_url": prop.metadata.rentometer_url,
+          "rentcast_url": prop.metadata.rentcast_url
         }
+      }

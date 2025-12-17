@@ -1,5 +1,5 @@
-from dataclasses import dataclass, fields, is_dataclass
-from typing import Protocol, Sequence
+from dataclasses import dataclass
+from typing import Protocol
 
 # NOTE: create Spreadsheet class to hold format information and take data like Property objects (or Locale objects?)
 # NOTE: functionality to interface with json files using json_loading.py that can be swapped out for a future database
@@ -29,9 +29,8 @@ specs and rules express intent without trying to assert geometry and do the layo
 
 
 class LayoutSource(Protocol):
-  """Right now, I just want to be sure that a given container of values has a sequence of strings as col_names.
-  Because I may change this rudimentary setup in how I structure Property, etc., I want to remind myself Layout expects it."""
-  col_names: Sequence[str]
+  """Confirm that input is a bundle, i.e., has an extract() method that returns a dict of str keys and dict values."""
+  def extract(self, values) -> dict[str, dict]: ...
 
 
 @dataclass(frozen=True)
@@ -55,26 +54,33 @@ class Layout:
 
 def build_layout(values: LayoutSource) -> Layout:
   """Design a dynamic layout with a row for every subattribute, e.g., for every field in a Property's LocationDetails."""
-  cols = values.col_names
+  col_names = []
   row_names = []
+  for col, row_dict in values.items():
+    # Every key in the values dict represents a column
+    col_names.append(col)
+    for key in row_dict.keys():
+      # Every key in the nested dict represents an attribute/row name
+      row_names.append(key)
 
+  # NOTE: I accidentally wrote the below code when I expected build_layout() to receive a Property object,
+  # forgetting that I already planned to send a bundle instead.
   # Populate row_names by iterating through the names of fields within in the values Dataclass.
-  # TODO: if there are different kinds of potential values other than Property objects, I should add a values/layout interface!
-
-  for col in cols:
-    subattr = getattr(values, col)
-    # Validate at this runtime stage that the LayoutSource contains dataclasses that can be enumerate.
-    if not is_dataclass(subattr):
-      raise TypeError("Error: a column name in col_names is not a dataclass stored within the input.")
+  # cols = values.col_names
+  # for col in cols:
+  #   subattr = getattr(values, col)
+  #   # Validate at this runtime stage that the LayoutSource contains dataclasses that can be enumerate.
+  #   if not is_dataclass(subattr):
+  #     raise TypeError("Error: a column name in col_names is not a dataclass stored within the input.")
     
-    for field in fields(subattr):
-      if field.name not in row_names:
-        row_names.append(field.name)
+  #   for field in fields(subattr):
+  #     if field.name not in row_names:
+  #       row_names.append(field.name)
 
   return Layout(
     header_rows = 1,
-    col_names = cols,
-    col_index = {name: i for i, name in enumerate(cols)}, # The Selector will look up index by name, so reverse enumerate
+    col_names = col_names,
+    col_index = {name: i for i, name in enumerate(col_names)}, # The Selector will look up index by name, so reverse enumerate
     row_names = row_names
   )
 
