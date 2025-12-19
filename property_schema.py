@@ -74,13 +74,13 @@ class Property:
     attributes: AttributeDetails
     values: ValueDetails
     metadata: Metadata
-    # COL_NAMES = ("location", "features", "attributes", "values", "metadata") # Hardcoding as class constant for now
 
     def as_bundle(self, bundle):
         """Return only a subset of relevant Property data as a bundle."""
         return bundle.extract(self)
     
 
+# NOTE: this needs to be recreated at the API client manager level, currently does not exist in tests.py
 """Protocol to enable API client manager to type-check that a bundle is being passed. Just one for now."""    
 # class NeedsNestedPropertyInfo(Protocol):
 #     def extract(self, prop: Property) -> tuple[dict, tuple]: ...

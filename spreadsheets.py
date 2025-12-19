@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Sequence, Any
 
 # NOTE: create Spreadsheet class to hold format information and take data like Property objects (or Locale objects?)
 # NOTE: functionality to interface with json files using json_loading.py that can be swapped out for a future database
@@ -25,7 +25,12 @@ I have a very minimal values-layout interface, LayoutSource, because any input e
 referent or a subattribute not having fields that can be enumerated, will be blatant and obvious at runtime when build_layout() is 
 called. An Selector interface between layout and format 'turns visual bugs into structural failures': what could be a subtle 
 problem that might not throw an error or even be executed for a long time can be detected early by ensuring, e.g., that format
-specs and rules express intent without trying to assert geometry and do the layout's job for it."""
+specs and rules express intent without trying to assert geometry and do the layout's job for it.
+
+Now, a twist: I'm presenting not traditional tabular data but a layout-based document, which arrays subsets of different columns
+with different row/field names across a grid. I'm thus going to try to think in terms of 'blocks' that contain a column header
+and contents, row names that differ by column to the left of the contents, and padding. To build a layout will then be to build
+a column block for however many columns there are."""
 
 
 class LayoutSource(Protocol):
@@ -42,46 +47,64 @@ class CellRange:
   end_col: int
 
 
+@dataclass(frozen=True)
+class ColumnBlock:
+  """Block containing column name, row names for that column, and padding/offset."""
+  name: str
+  row_names: list[str]
+  label_offset: int # Where the row names go
+  value_offset: int # Where the column contents go
+  width: int # Includes label, value contents, and then spacing for next block
+
+
 @dataclass
 class Layout:
-  """Major dimensions (columns and rows)"""
-  column_names: list[str]
-  column_index: dict[str, int]
-  row_names: list[str] # Attribute-oriented data, not row number oriented
-  row_index: dict[str, int]
+  """Layout representing the relation between column blocks"""
+  blocks: Sequence[ColumnBlock]
+  block_index: dict[str, ColumnBlock] # Pair block name and block obj for easy lookup by name
+  block_start: dict[str, int] # Pair block name and upper-left index for relative position
   header_rows: int
+
+  # Get total width of layout for, e.g., HeaderRow Selector
+  @property
+  def total_width(self) -> int:
+    return max(self.block_start[block.name] + block.width for block in self.blocks)
+
+
+def build_block(col_name, values) -> ColumnBlock:
+  """Each block represents the column header, row names, contents, and spacing/padding."""
+
+  row_names = list(values.keys()) # The values() are dicts where the keys are row names
+
+  return ColumnBlock(
+    name = col_name,
+    row_names = row_names,
+    label_offset = 0,
+    value_offset = 1,
+    width = 3 # Label + value + spacing
+  )
 
 
 def build_layout(values: LayoutSource) -> Layout:
-  """Design a dynamic layout with a row for every subattribute, e.g., for every field in a Property's LocationDetails."""
-  col_names = []
-  row_names = []
-  for col, row_dict in values.items():
-    # Every key in the values dict represents a column
-    col_names.append(col)
-    for key in row_dict.keys():
-      # Every key in the nested dict represents an attribute/row name
-      row_names.append(key)
+  """Design a dynamic layout with a block per column, each having variable row depth per number of fields."""
+  blocks = [] # list of block objects
+  block_index = {} # Pair block names and block objs for easy Selector lookup
+  block_start = {} # Pair block names and upper-left indices for relative positioning
 
-  # NOTE: I accidentally wrote the below code when I expected build_layout() to receive a Property object,
-  # forgetting that I already planned to send a bundle instead.
-  # Populate row_names by iterating through the names of fields within in the values Dataclass.
-  # cols = values.col_names
-  # for col in cols:
-  #   subattr = getattr(values, col)
-  #   # Validate at this runtime stage that the LayoutSource contains dataclasses that can be enumerate.
-  #   if not is_dataclass(subattr):
-  #     raise TypeError("Error: a column name in col_names is not a dataclass stored within the input.")
-    
-  #   for field in fields(subattr):
-  #     if field.name not in row_names:
-  #       row_names.append(field.name)
+  current_col_index = 0
+
+  for column in values.keys():
+    block = build_block(column, values[column])
+    blocks.append(block)
+    block_index[block.name] = block
+    block_start[block.name] = current_col_index
+    current_col_index += block.width
 
   return Layout(
-    header_rows = 1,
-    col_names = col_names,
-    col_index = {name: i for i, name in enumerate(col_names)}, # The Selector will look up index by name, so reverse enumerate
-    row_names = row_names
+    blocks = blocks,
+    block_index = block_index,
+    block_start = block_start,
+    header_rows = 1
   )
 
 
@@ -99,34 +122,71 @@ class FormatSpec:
 
 @dataclass(frozen=True)
 class FormatRule:
-  """A 'rule' for formatting combines a given spec with a given layout via a Selector interface.
-  E.g., """
+  """A 'rule' for formatting combines a given spec with a given layout via a Selector interface."""
   selector: Selector
   format: FormatSpec
 
+
 """SELECTORS: Map semantic regions (e.g., columns referenced by name) to particular grid ranges."""
+
 
 @dataclass(frozen=True)
 class HeaderRow:
-  """A header row Selector resolves into a CellRange that is header_rows deep and col_names wide."""
+  """A header row Selector resolves into a CellRange that is header_rows deep and col_names plus spacing wide."""
   def resolve(self, layout: Layout) -> CellRange:
     return CellRange(
       start_row = 0,
       end_row = layout.header_rows,
       start_col = 0,
-      end_col = len(layout.col_names)
+      end_col = layout.total_width
     )
   
+# TODO: Now the Selectors below are finding subsets of ColumnBlocks within the layout
+
 @dataclass(frozen=True)
-class ColumnByName:
-  """A column Selector resolves into a CellRange that is row_names deep and one column wide."""
+class RowLabelsByBlock:
+  """Select just the row names for a given ColumnBlock found by column name."""
   name: str
-  
+
   def resolve(self, layout: Layout) -> CellRange:
-    col = layout.col_index[self.name] # Look up a column's index by name, previously paired by enumerate()
+    col = layout.block_start[self.name] # Look up column index by name
+    row_names = layout.block_index[self.name].row_names
+    row_len = len(row_names)
     return CellRange(
       start_row = layout.header_rows,
-      end_row = layout.header_rows + len(layout.row_names), # Range is as deep as there are value subattributes
+      end_row = layout.header_rows + row_len,
       start_col = col,
-      end_col = col + 1 # It's literally one column
+      end_col = col + 1
     )
+
+
+# @dataclass(frozen=True)
+# class ColumnContentsByName:
+#   """A column contents Selector resolves into a CellRange that is row_names deep and one column wide."""
+#   name: str
+  
+#   def resolve(self, layout: Layout) -> CellRange:
+#     col = layout.col_index[self.name] # Look up a column's index by name, previously paired by enumerate()
+#     row_names_for_col = layout.row_dict[col].values()
+#     return CellRange(
+#       start_row = layout.header_rows,
+#       end_row = layout.header_rows + len(row_names_for_col), # Range is as deep as there are value subattributes
+#       start_col = col,
+#       end_col = col + 1
+#     )
+  
+
+# @dataclass(frozen=True)
+# class RowNamesByColumnName:
+#   """The names of the row fields will be situated to the left of the column's value contents."""
+#   name: str
+
+#   def resolve(self, layout: Layout) -> CellRange:
+#     col = layout.col_index[self.name]
+#     row_names_for_col = layout.row_dict[col].values()
+#     return CellRange(
+#       start_row = layout.header_rows,
+#       end_row = layout.header_rows + len(row_names_for_col),
+#       start_col = col - 1,
+#       end_col = col
+#     )
