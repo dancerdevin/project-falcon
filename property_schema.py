@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Protocol
 
 # TODO: route data intake (from Rentcast and Rentometer) into Property objects
 # Next time: review what data is coming from where, what sort of dict results, and refactor to parse into Details objects.
@@ -74,61 +73,9 @@ class Property:
     attributes: AttributeDetails
     values: ValueDetails
     metadata: Metadata
-
-    def as_bundle(self, bundle):
-        """Return only a subset of relevant Property data as a bundle."""
-        return bundle.extract(self)
     
 
 # NOTE: this needs to be recreated at the API client manager level, currently does not exist in tests.py
 """Protocol to enable API client manager to type-check that a bundle is being passed. Just one for now."""    
 # class NeedsNestedPropertyInfo(Protocol):
 #     def extract(self, prop: Property) -> tuple[dict, tuple]: ...
-
-
-"""Bundles, rather than inheriting from an abstract bundle class, will be structurally typed by what they extract()."""
-class NestedPropertyBundle:
-  def extract(self, prop: Property):
-      return {
-        "location": {
-          "street_address": prop.location.street_address,
-          "city": prop.location.city,
-          "state": prop.location.state,
-          "zip_code": prop.location.zip_code,
-          "county": prop.location.county,
-          "latitude": prop.location.latitude,
-          "longitude": prop.location.longitude
-        },
-        "features": {
-          "property_type": prop.features.property_type,
-          "bedrooms": prop.features.bedrooms,
-          "bathrooms": prop.features.bathrooms,
-          "sqft": prop.features.sqft,
-          "lot_size": prop.features.lot_size
-        },
-        "attributes": {
-          "year_built": prop.attributes.year_built,
-          "assessor_ID": prop.attributes.assessor_ID,
-          "legal_description": prop.attributes.legal_description,
-          "owner_occupied": prop.attributes.owner_occupied
-        },
-        "values": {
-          "value_est": prop.values.value_est,
-          "property_tax": prop.values.property_tax,
-          "mean_rent_est": prop.values.mean_rent_est,
-          "median_rent_est": prop.values.median_rent_est,
-          "min_rent": prop.values.min_rent,
-          "max_rent": prop.values.max_rent,
-          "mortgage_est": prop.values.mortgage_est,
-          "insurance_est": prop.values.insurance_est,
-          "monthly_tax_est": prop.values.monthly_tax_est,
-          "capex_est": prop.values.capex_est,
-          "mgmt_est": prop.values.mgmt_est,
-          "sum_est_costs": prop.values.sum_est_costs   
-        },
-        "metadata": {
-          "filename": prop.metadata.filename,
-          "rentometer_url": prop.metadata.rentometer_url,
-          "rentcast_url": prop.metadata.rentcast_url
-        }
-      }

@@ -1,5 +1,6 @@
-from dataclasses import dataclass
-from typing import Protocol, Sequence, Any
+from dataclasses import dataclass, asdict
+from typing import Protocol, Sequence
+from property_schema import Property
 
 # NOTE: create Spreadsheet class to hold format information and take data like Property objects (or Locale objects?)
 # NOTE: functionality to interface with json files using json_loading.py that can be swapped out for a future database
@@ -31,11 +32,6 @@ Now, a twist: I'm presenting not traditional tabular data but a layout-based doc
 with different row/field names across a grid. I'm thus going to try to think in terms of 'blocks' that contain a column header
 and contents, row names that differ by column to the left of the contents, and padding. To build a layout will then be to build
 a column block for however many columns there are."""
-
-
-class LayoutSource(Protocol):
-  """Confirm that input is a bundle, i.e., has an extract() method that returns a dict of str keys and dict values."""
-  def extract(self, values) -> dict[str, dict]: ...
 
 
 @dataclass(frozen=True)
@@ -75,6 +71,7 @@ def build_block(col_name, values) -> ColumnBlock:
   """Each block represents the column header, row names, contents, and spacing/padding."""
 
   row_names = list(values.keys()) # The values() are dicts where the keys are row names
+  # NOTE: next(iter(values)) would be faster and key reference is implied by dict reference
 
   return ColumnBlock(
     name = col_name,
@@ -85,8 +82,9 @@ def build_block(col_name, values) -> ColumnBlock:
   )
 
 
-def build_layout(values: LayoutSource) -> Layout:
+def build_layout(prop: Property) -> Layout:
   """Design a dynamic layout with a block per column, each having variable row depth per number of fields."""
+  values = asdict(prop) # Render Property dataclass as nested dict
   blocks = [] # list of block objects
   block_index = {} # Pair block names and block objs for easy Selector lookup
   block_start = {} # Pair block names and upper-left indices for relative positioning
@@ -110,6 +108,7 @@ def build_layout(values: LayoutSource) -> Layout:
 
 class Selector(Protocol):
   """A Selector interface resolves an abstract layout into a specific cell range on a particular grid."""
+  # TODO: List[CellRange]?
   def resolve(self, layout: Layout) -> CellRange: ...
 
 
