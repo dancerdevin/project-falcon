@@ -25,12 +25,22 @@ test_rules = [
   FormatRule(format=test_spec, 
              selector=RowLabelsByBlock(name=block.name)) for block in test_layout.blocks
              ] # Select row labels for each block and apply 
-
+test_rules.extend([
+  FormatRule(format=test_spec, 
+             selector=ValuesByBlock(name=block.name)) for block in test_layout.blocks
+             ])
+test_rules.extend(
+  [FormatRule(format=test_spec, 
+             selector=AllRowLabels())])
+test_rules.extend(
+  [FormatRule(format=test_spec, 
+             selector=AllValues())])
 
 def test_resolver(layout, rules) -> list[tuple]:
   resolved_rules = []
 
   for rule in rules:
+    print(rule)
     range = rule.selector.resolve(layout)
     resolved_rules.append((range, rule.format))
 

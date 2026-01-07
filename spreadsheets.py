@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import Protocol, Sequence
+from typing import Protocol, Sequence, List
 from property_schema import Property
 
 # NOTE: create Spreadsheet class to hold format information and take data like Property objects (or Locale objects?)
@@ -20,13 +20,14 @@ For example, a Selector finds a given column's index by its name and the format 
 blue background, and apply it to that range, wherever it is.' In sum, the layout abstractly represents the whole and the Selector
 is built to find where consistently relevant parts of that whole are going to be on a given grid and apply the right formatting.
 This enables, e.g., passing in new values and using the same Layout objects and format rules to dynamically adapt to different
-grid ranges required to fit the new values, which may have a different number of subattributes with different numbers of fields.
+grid ranges required to fit the new values.
 
-I have a very minimal values-layout interface, LayoutSource, because any input error, like a column name having no subattribute 
-referent or a subattribute not having fields that can be enumerated, will be blatant and obvious at runtime when build_layout() is 
-called. An Selector interface between layout and format 'turns visual bugs into structural failures': what could be a subtle 
-problem that might not throw an error or even be executed for a long time can be detected early by ensuring, e.g., that format
-specs and rules express intent without trying to assert geometry and do the layout's job for it.
+I have no values-layout interface now because I want these Spreadsheets to strictly be PropertySpreadsheets: it expects a Property object to 
+treat as nested dict. build_layout() could in theory work with any dataclass with dict fields but I want to be able to proceed assuming 
+I'm working with a Property. Input errors raise on runtime. But a Selector interface between layout and format 'turns visual bugs into 
+structural failures': what could be a subtle problem that might not throw an error or even be executed for a long time can be detected 
+early by ensuring, e.g., that format specs and rules express intent without trying to assert geometry and do the layout's job for it.
+Specifically, my Protocol defines a Selector as resolve()ing into a list of CellRanges and the CellRanges assert geometry, not the Selector.
 
 Now, a twist: I'm presenting not traditional tabular data but a layout-based document, which arrays subsets of different columns
 with different row/field names across a grid. I'm thus going to try to think in terms of 'blocks' that contain a column header
@@ -71,7 +72,6 @@ def build_block(col_name, values) -> ColumnBlock:
   """Each block represents the column header, row names, contents, and spacing/padding."""
 
   row_names = list(values.keys()) # The values() are dicts where the keys are row names
-  # NOTE: next(iter(values)) would be faster and key reference is implied by dict reference
 
   return ColumnBlock(
     name = col_name,
@@ -84,6 +84,9 @@ def build_block(col_name, values) -> ColumnBlock:
 
 def build_layout(prop: Property) -> Layout:
   """Design a dynamic layout with a block per column, each having variable row depth per number of fields."""
+  if not isinstance(prop, Property):
+    raise Exception("Error: build_layout expects Property object input.")
+  
   values = asdict(prop) # Render Property dataclass as nested dict
   blocks = [] # list of block objects
   block_index = {} # Pair block names and block objs for easy Selector lookup
@@ -107,9 +110,8 @@ def build_layout(prop: Property) -> Layout:
 
 
 class Selector(Protocol):
-  """A Selector interface resolves an abstract layout into a specific cell range on a particular grid."""
-  # TODO: List[CellRange]?
-  def resolve(self, layout: Layout) -> CellRange: ...
+  """A Selector interface resolves an abstract layout into a list of cell ranges on a particular grid."""
+  def resolve(self, layout: Layout) -> List[CellRange]: ...
 
 
 @dataclass(frozen=True)
@@ -130,62 +132,67 @@ class FormatRule:
 
 
 @dataclass(frozen=True)
-class HeaderRow:
-  """A header row Selector resolves into a CellRange that is header_rows deep and col_names plus spacing wide."""
-  def resolve(self, layout: Layout) -> CellRange:
-    return CellRange(
-      start_row = 0,
-      end_row = layout.header_rows,
-      start_col = 0,
-      end_col = layout.total_width
-    )
-  
-# TODO: Now the Selectors below are finding subsets of ColumnBlocks within the layout
+class ColumnHeaders:
+  """A header row Selector resolves into a list of CellRanges that is header_rows deep and col_names plus spacing wide."""
+  def resolve(self, layout: Layout) -> List[CellRange]:
+    range_list = []
+    for block in layout.blocks:
+      # To select the header text and no empty/padding cells, add value_offset to each ColumnBlock's block_index.
+      start_col = layout.block_index[block.name] + block.value_offset
+      range_list.append(CellRange(
+        start_row = 0,
+        end_row = layout.header_rows,
+        start_col = start_col,
+        end_col = start_col + 1
+      ))
+    return range_list
 
 @dataclass(frozen=True)
 class RowLabelsByBlock:
   """Select just the row names for a given ColumnBlock found by column name."""
   name: str
 
-  def resolve(self, layout: Layout) -> CellRange:
+  def resolve(self, layout: Layout) -> List[CellRange]:
     col = layout.block_start[self.name] # Look up column index by name
     row_names = layout.block_index[self.name].row_names
     row_len = len(row_names)
-    return CellRange(
+    return [CellRange(
       start_row = layout.header_rows,
       end_row = layout.header_rows + row_len,
       start_col = col,
       end_col = col + 1
-    )
+    )]
 
 
-# @dataclass(frozen=True)
-# class ColumnContentsByName:
-#   """A column contents Selector resolves into a CellRange that is row_names deep and one column wide."""
-#   name: str
-  
-#   def resolve(self, layout: Layout) -> CellRange:
-#     col = layout.col_index[self.name] # Look up a column's index by name, previously paired by enumerate()
-#     row_names_for_col = layout.row_dict[col].values()
-#     return CellRange(
-#       start_row = layout.header_rows,
-#       end_row = layout.header_rows + len(row_names_for_col), # Range is as deep as there are value subattributes
-#       start_col = col,
-#       end_col = col + 1
-#     )
-  
+@dataclass(frozen=True)
+class ValuesByBlock:
+  """Select the values for a given ColumnBlock found by column name."""
+  name: str
 
-# @dataclass(frozen=True)
-# class RowNamesByColumnName:
-#   """The names of the row fields will be situated to the left of the column's value contents."""
-#   name: str
+  def resolve(self, layout: Layout) -> List[CellRange]:
+    col = layout.block_start[self.name] + 1 # Look up column index by name
+    row_names = layout.block_index[self.name].row_names
+    row_len = len(row_names)
+    return [CellRange(
+      start_row = layout.header_rows,
+      end_row = layout.header_rows + row_len,
+      start_col = col,
+      end_col = col + 1
+    )]
 
-#   def resolve(self, layout: Layout) -> CellRange:
-#     col = layout.col_index[self.name]
-#     row_names_for_col = layout.row_dict[col].values()
-#     return CellRange(
-#       start_row = layout.header_rows,
-#       end_row = layout.header_rows + len(row_names_for_col),
-#       start_col = col - 1,
-#       end_col = col
-#     )
+@dataclass(frozen=True)
+class AllRowLabels:
+  def resolve(self, layout: Layout) -> List[CellRange]:
+    # Call RowLabelsByBlock per block and add the lists of CellRanges together.
+    range_list = []
+    for block in layout.blocks:
+      range_list.extend(RowLabelsByBlock(name=block.name).resolve(layout))
+    return range_list
+
+@dataclass(frozen=True)
+class AllValues:
+  def resolve(self, layout: Layout) -> List[CellRange]:
+    range_list = []
+    for block in layout.blocks:
+      range_list.extend(ValuesByBlock(name=block.name).resolve(layout))
+    return range_list
