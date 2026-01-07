@@ -1,87 +1,30 @@
-from os import path
-
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-
-"""
-Connect to Google Sheets API and instantiate Google Sheet object for creation.
-"""
-
-# If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
-# Google Sheets API parameters
-API_NAME = "sheets"
-API_VERSION = "v4"
-
-# Spreadsheet constants, e.g., title
-SPREADSHEET_TITLE = "FormatSpec Test v2"
-SHEET_ONE_TITLE = "Test Sheet"
+import os
+import sys
+from gsheets_client import GoogleSheetsAPIClient, SPREADSHEET_TITLE, SHEET_ONE_TITLE
+from create_gsheet import GoogleSheet
+from update_gsheet import PropertySpreadsheet
 
 
-class GoogleSheetsAPIClient:
-  """Generate Google Sheet from aggregate data on a single property."""
-  def __init__(self):
-    self.creds = None
-    self.client = None
-    self.build_client()
+# Locate parent directory to import property data scripts
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
 
-  def build_and_store_creds(self):
-    """From API quickstart: check for valid credentials and, if none, build and store."""
-     # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if path.exists("token.json"):
-      self.creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+from property_level_analysis import address_data_to_gsheet
 
-    # If there are no (valid) credentials available, let the user log in.
-    if not self.creds or not self.creds.valid:
-      if self.creds and self.creds.expired and self.creds.refresh_token:
-        self.creds.refresh(Request())
-      else:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            "credentials.json", SCOPES
-        )
-        self.creds = flow.run_local_server(port=0)
-
-      # Save the credentials for the next run
-      with open("token.json", "w") as token:
-        token.write(self.creds.to_json())
-
-  def build_client(self):
-    if not self.creds:
-      self.build_and_store_creds()
-
-    try:
-      self.client = build(API_NAME, API_VERSION, credentials=self.creds)
-
-    except HttpError as err:
-      print("Error when attempting to build Google Sheets API client: \n")
-      print(err)
+# DATETIME_STRING used to parse JSON filenames for addresses containing ADDRESS_STRING
+ADDRESS_STRING = "7236 S Bell St"
+DATETIME_STRING = "2025-10-28"
 
 
-class GoogleSheet:
-  """Initialize with Google Sheet schema and build Google Sheet."""
-  def __init__(self, client, spreadsheet_title, sheet_one_title):
-    # TODO: error handling to ensure client is connected and auth'd
-    self.client = client
-    self.sheet_body = {
-        "properties": {
-          "title": spreadsheet_title
-        },
-        "sheets": [
-          {
-            "properties": {
-              "title": sheet_one_title
-            }
-          }
-        ]
-      }
-    
-    # Create spreadsheet
-    self.spreadsheet = self.client.spreadsheets().create(body=self.sheet_body).execute()
+def main():
+  address_dict = address_data_to_gsheet(ADDRESS_STRING, DATETIME_STRING)
+  client = GoogleSheetsAPIClient()
+  gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
+  property_gsheet = PropertySpreadsheet(address_dict, gsheet)
+  property_gsheet.update_values()
+  property_gsheet.update_format()
 
-    print(f"Spreadsheet created: {self.spreadsheet.get("spreadsheetUrl")}")
+
+if __name__ == "__main__":
+  main()
