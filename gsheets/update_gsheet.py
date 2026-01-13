@@ -56,42 +56,11 @@ class FormatData:
 # then majorDimension is just whether or not it's the headers on top or not. Then similarly instantiate FormatData with FormatRules using same Selector code.
 # So values can just use Selectors to produce lists of CellRanges and format can use FormatRules to add FormatSpecs TO Selector-drived CellRanges. FormatData
 # CellRanges can also be asdict-ed straight into what Gsheets wants, I think, because those are not in A1 format.
-class PropertySpreadsheetNew:
-  """Translate my Property and Layout objects into structures more easily recognized by Gsheets: my ValueData and FormatData."""
-  def __init__(self, prop: Property, layout: Layout):
-    prop_dict = asdict(prop)
-    value_data_list = self.value_data_builder()
-    format_data_list = self.format_data_builder()
-    # for block in layout.blocks:
-      # Use a Selector to return a grid range.
-      # Find the relevant values in prop_dict by matching column name.
-      # Conditional for majorDimension: ROWS if headers, else COLUMNS
-      # Append ValueData() instance to value_data list
-      # Then use the bigger selectors to set FormatData (make the FormatRules in advance and have this class expect them as a third input)
-      # pass
-
-    # def value_data_builder(prop: Property):
-    #   # Step 1: return a ValueData tuple so Gsheets can turn it into a Gsheet
-    #   return [ValueData(SHEET_ONE_TITLE + "!B1:1", CATEGORY_HEADERS, "ROWS"),
-    #   ValueData(SHEET_ONE_TITLE + "!A2:A", list(location_dict.keys()), "COLUMNS")]
-
-    # def format_data_builder(prop: Property):
-    #   pass
-    
-
-class PropertyGsheet:
-  """Input PropertySpreadsheet and Gsheet, implement update_values() and update_format() to turn ValueData/FormatData into dicts."""
-  def __init__(self, propsheet: PropertySpreadsheetNew, gsheet: GoogleSheet):
-    pass
-
 
 # TODO: what do I NEED from this still? I don't need all these dicts. I will need to translate ranges into A1 format for values.
 # So, like: on the initialization of a PropertyGsheet, build_valuedata and build_formatdata, effectively, FROM the Property, Layout, and Gsheet inputs
 class PropertySpreadsheet:
-  def __init__(self, prop: Property, gsheet):
-    self.gsheet = gsheet
-    self.gsheet_id = gsheet.spreadsheet.get("spreadsheetId")
-
+  def __init__(self, prop: Property):
     headers = list(asdict(prop).keys())
     location_dict = asdict(prop.location)
     features_dict = asdict(prop.features)
@@ -163,6 +132,14 @@ class PropertySpreadsheet:
         }
       )
     ]
+
+class PropertyGsheet:
+  """Input PropertySpreadsheet and Gsheet, implement update_values() and update_format() to turn ValueData/FormatData into dicts."""
+  def __init__(self, propsheet: PropertySpreadsheet, gsheet: GoogleSheet):
+    self.gsheet = gsheet
+    self.gsheet_id = gsheet.spreadsheet.get("spreadsheetId")
+    self.value_data_list = propsheet.value_data_list
+    self.format_specs = propsheet.format_specs
 
   def update_values(self):
     """Populate spreadsheet with values using spreadsheet.values().batchUpdate()."""

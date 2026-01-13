@@ -2,7 +2,7 @@ import os
 import sys
 from gsheets_client import GoogleSheetsAPIClient, SPREADSHEET_TITLE, SHEET_ONE_TITLE
 from create_gsheet import GoogleSheet
-from update_gsheet import PropertySpreadsheet
+from update_gsheet import PropertySpreadsheet, PropertyGsheet
 
 # Locate parent directory to import property data scripts
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -25,7 +25,8 @@ def main():
 
   client = GoogleSheetsAPIClient()
   gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
-  property_gsheet = PropertySpreadsheet(prop_obj, gsheet)
+  prop_sheet = PropertySpreadsheet(prop_obj)
+  property_gsheet = PropertyGsheet(prop_sheet, gsheet)
   property_gsheet.update_values()
   property_gsheet.update_format()
 
