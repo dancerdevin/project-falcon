@@ -1,17 +1,34 @@
-from gsheets import SHEET_ONE_TITLE
+from gsheets_client import SHEET_ONE_TITLE
+from create_gsheet import GoogleSheet
+from dataclasses import asdict
+import os
+import sys
+
+# Locate parent directory to import property data scripts
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
+from spreadsheets import Layout
+from property_schema import Property
 
 """
 Populate Google Sheet object with property data by updating values and formatting.
 """
 
-# TODO: refactor to receive a Spreadsheet object with Property object data once those are complete
-# A lot of the data that is stored in this file will end up being stored in a lower layer
+# TODO: reconceive this as plug-ins that receive a Property and Layout. Update_values() will need both, update_format just the latter
+# update_values() will take Property data and use Selectors by Layout block to populate the right values in the right places
+# update_format() will take the Layout and use the All-type Selectors to apply FormatRules and translate them in Gsheets lingo
+# build_valuedata() and build_formatdata() could be the plug-in functionality and feed into update_values()/update_format()
+# NOTE: due to the layers of refactoring, there may be some unnecessary mediation here, but I think that's OK
 
+# NOTE: I don't THINK that I need this anymore? This feels like too many layers of abstraction as long as I have a plug-in (or remake as plug-in)
 class FormatKwarg:
   """Expected kwargs for formatting updates using repeat_cell_builder()."""
   BG_COLOR = "bg_color"
   TEXT_COLOR = "text_color"
 
+# NOTE: I think it's fine to retain this for my own legibility
 class ValueData:
   """Data required to update values includes cell range as A1 format string, values, and major_dimension (rows or columns)."""
   def __init__(self, range, values, major_dimension):
@@ -19,6 +36,7 @@ class ValueData:
     self.values = values
     self.major_dimension = major_dimension
 
+# NOTE: CellRanges will be passed into this functionality, so I can import the class and eliminate GridRange
 class GridRange:
   """Ranges to update formatting, in int format."""
   def __init__(self, start_row, end_row, start_col, end_col):
@@ -27,86 +45,118 @@ class GridRange:
     self.start_col = start_col
     self.end_col = end_col
 
-class FormatSpec:
+# NOTE: Let's call this FormatData to distinguish it from FormatSpec/show its paralellism with ValueData
+class FormatData:
   """Data required to update format includes cell range in a tuple of ints and FormatKwargs."""
   def __init__(self, grid_range, **kwargs):
     self.grid_range = grid_range
     self.kwargs = kwargs
 
+# TODO: OK. first, use my Selector code to generate CellRanges, then translate into A1 format for ValueData, then grab keys() or values() as values,
+# then majorDimension is just whether or not it's the headers on top or not. Then similarly instantiate FormatData with FormatRules using same Selector code.
+# So values can just use Selectors to produce lists of CellRanges and format can use FormatRules to add FormatSpecs TO Selector-drived CellRanges. FormatData
+# CellRanges can also be asdict-ed straight into what Gsheets wants, I think, because those are not in A1 format.
+class PropertySpreadsheetNew:
+  """Translate my Property and Layout objects into structures more easily recognized by Gsheets: my ValueData and FormatData."""
+  def __init__(self, prop: Property, layout: Layout):
+    prop_dict = asdict(prop)
+    value_data_list = self.value_data_builder()
+    format_data_list = self.format_data_builder()
+    # for block in layout.blocks:
+      # Use a Selector to return a grid range.
+      # Find the relevant values in prop_dict by matching column name.
+      # Conditional for majorDimension: ROWS if headers, else COLUMNS
+      # Append ValueData() instance to value_data list
+      # Then use the bigger selectors to set FormatData (make the FormatRules in advance and have this class expect them as a third input)
+      # pass
 
-CATEGORY_HEADERS = ["Location", "", "", "Features", "", "", "Values", "", "", "Metadata"]
-LOCATION_KEYS = ["addressLine1", "city", "state", "zipCode", "county", "latitude", "longitude"]
-FEATURES_KEYS = ["propertyType", "bedrooms", "bathrooms", "squareFootage", "lotSize", "yearBuilt", "zoning", "garage", "heatingType"]
-VALUES_KEYS = ["lastSalePrice", "ownerOccupied", "value", "propertyTax", "mean", "median", "min", "max", "mortgage", "insurance", "monthly_tax", "capex", "management", "sum_costs"]
-METADATA_KEYS = ["assessorID", "legalDescription", "lastSaleDate", "filename"]
+    # def value_data_builder(prop: Property):
+    #   # Step 1: return a ValueData tuple so Gsheets can turn it into a Gsheet
+    #   return [ValueData(SHEET_ONE_TITLE + "!B1:1", CATEGORY_HEADERS, "ROWS"),
+    #   ValueData(SHEET_ONE_TITLE + "!A2:A", list(location_dict.keys()), "COLUMNS")]
+
+    # def format_data_builder(prop: Property):
+    #   pass
+    
+
+class PropertyGsheet:
+  """Input PropertySpreadsheet and Gsheet, implement update_values() and update_format() to turn ValueData/FormatData into dicts."""
+  def __init__(self, propsheet: PropertySpreadsheetNew, gsheet: GoogleSheet):
+    pass
 
 
+# TODO: what do I NEED from this still? I don't need all these dicts. I will need to translate ranges into A1 format for values.
+# So, like: on the initialization of a PropertyGsheet, build_valuedata and build_formatdata, effectively, FROM the Property, Layout, and Gsheet inputs
 class PropertySpreadsheet:
-  def __init__(self, address_dict, gsheet):
+  def __init__(self, prop: Property, gsheet):
     self.gsheet = gsheet
     self.gsheet_id = gsheet.spreadsheet.get("spreadsheetId")
 
-    location_dict = {key: address_dict[key] for key in LOCATION_KEYS if key in address_dict}
-    features_dict = {key: address_dict[key] for key in FEATURES_KEYS if key in address_dict}
-    values_dict = {key: address_dict[key] for key in VALUES_KEYS if key in address_dict}
-    metadata_dict = {key: address_dict[key] for key in METADATA_KEYS if key in address_dict}
+    headers = list(asdict(prop).keys())
+    location_dict = asdict(prop.location)
+    features_dict = asdict(prop.features)
+    values_dict = asdict(prop.values)
+    attr_dict = asdict(prop.attributes)
+    metadata_dict = asdict(prop.metadata)
 
     self.value_data_list = [
-      ValueData(SHEET_ONE_TITLE + "!B1:1", CATEGORY_HEADERS, "ROWS"),
+      ValueData(SHEET_ONE_TITLE + "!B1:1", headers, "ROWS"),
       ValueData(SHEET_ONE_TITLE + "!A2:A", list(location_dict.keys()), "COLUMNS"),
       ValueData(SHEET_ONE_TITLE + "!B2:B", list(location_dict.values()), "COLUMNS"),
       ValueData(SHEET_ONE_TITLE + "!D2:D", list(features_dict.keys()), "COLUMNS"),
       ValueData(SHEET_ONE_TITLE + "!E2:E", list(features_dict.values()), "COLUMNS"),
       ValueData(SHEET_ONE_TITLE + "!G2:G", list(values_dict.keys()), "COLUMNS"),
       ValueData(SHEET_ONE_TITLE + "!H2:H", list(values_dict.values()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!J2:J", list(metadata_dict.keys()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!K2:K", list(metadata_dict.values()), "COLUMNS")
+      ValueData(SHEET_ONE_TITLE + "!J2:J", list(attr_dict.keys()), "COLUMNS"),
+      ValueData(SHEET_ONE_TITLE + "!K2:K", list(attr_dict.values()), "COLUMNS"),
+      ValueData(SHEET_ONE_TITLE + "!M2:M", list(metadata_dict.keys()), "COLUMNS"),
+      ValueData(SHEET_ONE_TITLE + "!N2:N", list(metadata_dict.values()), "COLUMNS")
   ]
     
     self.format_specs = [
-      FormatSpec(GridRange(0, 1, 1, 2), 
+      FormatData(GridRange(0, 1, 1, 2), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(GridRange(0, 1, 4, 5), 
+      FormatData(GridRange(0, 1, 4, 5), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(GridRange(0, 1, 7, 8), 
+      FormatData(GridRange(0, 1, 7, 8), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(GridRange(0, 1, 10, 11), 
+      FormatData(GridRange(0, 1, 10, 11), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(GridRange(1, len(LOCATION_KEYS) + 1, 0, 1), 
+      FormatData(GridRange(1, len(location_dict) + 1, 0, 1), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(GridRange(1, len(FEATURES_KEYS) + 1, 3, 4), 
+      FormatData(GridRange(1, len(features_dict) + 1, 3, 4), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(GridRange(1, len(VALUES_KEYS) + 1, 6, 7), 
+      FormatData(GridRange(1, len(values_dict) + 1, 6, 7), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatSpec(GridRange(1, len(METADATA_KEYS) + 1, 9, 10), 
+      FormatData(GridRange(1, len(metadata_dict) + 1, 9, 10), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}

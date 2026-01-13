@@ -4,13 +4,14 @@ from gsheets_client import GoogleSheetsAPIClient, SPREADSHEET_TITLE, SHEET_ONE_T
 from create_gsheet import GoogleSheet
 from update_gsheet import PropertySpreadsheet
 
-
 # Locate parent directory to import property data scripts
 current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
-from property_level_analysis import address_data_to_gsheet
+from property_level_analysis import *
+from spreadsheets import *
+from property_schema import *
 
 # DATETIME_STRING used to parse JSON filenames for addresses containing ADDRESS_STRING
 ADDRESS_STRING = "7236 S Bell St"
@@ -18,10 +19,13 @@ DATETIME_STRING = "2025-10-28"
 
 
 def main():
-  address_dict = address_data_to_gsheet(ADDRESS_STRING, DATETIME_STRING)
+  # address_dict = address_data_to_gsheet(ADDRESS_STRING, DATETIME_STRING)
+  prop_list = build_properties("2025-10-10_12-42-27", "2025-10-22_13-42")
+  prop_obj = prop_list[0]
+
   client = GoogleSheetsAPIClient()
   gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
-  property_gsheet = PropertySpreadsheet(address_dict, gsheet)
+  property_gsheet = PropertySpreadsheet(prop_obj, gsheet)
   property_gsheet.update_values()
   property_gsheet.update_format()
 
