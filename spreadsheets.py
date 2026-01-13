@@ -130,7 +130,6 @@ class FormatRule:
 
 """SELECTORS: Map semantic regions (e.g., columns referenced by name) to particular grid ranges."""
 
-
 @dataclass(frozen=True)
 class ColumnHeaders:
   """A header row Selector resolves into a list of CellRanges that is header_rows deep and col_names plus spacing wide."""

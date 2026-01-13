@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
-from spreadsheets import Layout
+from spreadsheets import CellRange, Layout, RowLabelsByBlock, ValuesByBlock
 from property_schema import Property
 
 """
@@ -36,15 +36,6 @@ class ValueData:
     self.values = values
     self.major_dimension = major_dimension
 
-# NOTE: CellRanges will be passed into this functionality, so I can import the class and eliminate GridRange
-class GridRange:
-  """Ranges to update formatting, in int format."""
-  def __init__(self, start_row, end_row, start_col, end_col):
-    self.start_row = start_row
-    self.end_row = end_row
-    self.start_col = start_col
-    self.end_col = end_col
-
 # NOTE: Let's call this FormatData to distinguish it from FormatSpec/show its paralellism with ValueData
 class FormatData:
   """Data required to update format includes cell range in a tuple of ints and FormatKwargs."""
@@ -60,7 +51,7 @@ class FormatData:
 # TODO: what do I NEED from this still? I don't need all these dicts. I will need to translate ranges into A1 format for values.
 # So, like: on the initialization of a PropertyGsheet, build_valuedata and build_formatdata, effectively, FROM the Property, Layout, and Gsheet inputs
 class PropertySpreadsheet:
-  def __init__(self, prop: Property):
+  def __init__(self, prop: Property, layout: Layout):
     headers = list(asdict(prop).keys())
     location_dict = asdict(prop.location)
     features_dict = asdict(prop.features)
@@ -68,70 +59,105 @@ class PropertySpreadsheet:
     attr_dict = asdict(prop.attributes)
     metadata_dict = asdict(prop.metadata)
 
-    self.value_data_list = [
-      ValueData(SHEET_ONE_TITLE + "!B1:1", headers, "ROWS"),
-      ValueData(SHEET_ONE_TITLE + "!A2:A", list(location_dict.keys()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!B2:B", list(location_dict.values()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!D2:D", list(features_dict.keys()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!E2:E", list(features_dict.values()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!G2:G", list(values_dict.keys()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!H2:H", list(values_dict.values()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!J2:J", list(attr_dict.keys()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!K2:K", list(attr_dict.values()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!M2:M", list(metadata_dict.keys()), "COLUMNS"),
-      ValueData(SHEET_ONE_TITLE + "!N2:N", list(metadata_dict.values()), "COLUMNS")
-  ]
+    # Iteratively generate list of ValueData from Property.
+    self.value_data_list = [ValueData(SHEET_ONE_TITLE + "!B1:1", headers, "ROWS")]
+    prop_dict = asdict(prop)
+    # TODO: header value/layout info here
+
+    for k, v in prop_dict.items():
+      # k is category/column (e.g., location), v is dict of field/rowname and value.
+      # NOTE: OK: here I can use Selectors to grab CellRanges as long as I pass this a Layout, then convert with _col_int_to_char()
+      # Find ColumnBlock with rowname, find relevant CellRange with Selector.
+      row_name_range_list = RowLabelsByBlock(k).resolve(layout)
+      row_name_range = row_name_range_list[0]
+      start_col_str = self._col_int_to_char(row_name_range.start_col)
+      end_col_str = self._col_int_to_char(row_name_range.end_col)
+      range_str = SHEET_ONE_TITLE + f"!{start_col_str}1:{end_col_str}"
+      self.value_data_list.append(ValueData(range=range_str, values=list(v.keys()), major_dimension="COLUMNS"))
+      value_range_list = ValuesByBlock(k).resolve(layout)
+      value_range = value_range_list[0]
+      # NOTE: repeat code, consolidate
+      start_col_str = self._col_int_to_char(value_range.start_col)
+      end_col_str = self._col_int_to_char(value_range.end_col)
+      range_str = SHEET_ONE_TITLE + f"!{start_col_str}1:{end_col_str}"
+      self.value_data_list.append(ValueData(range=range_str, values=list(v.values()), major_dimension="COLUMNS"))
+      
+
+  #   self.value_data_list = [
+  #     ValueData(SHEET_ONE_TITLE + "!B1:1", headers, "ROWS"),
+  #     ValueData(SHEET_ONE_TITLE + "!A2:A", list(location_dict.keys()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!B2:B", list(location_dict.values()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!D2:D", list(features_dict.keys()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!E2:E", list(features_dict.values()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!G2:G", list(values_dict.keys()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!H2:H", list(values_dict.values()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!J2:J", list(attr_dict.keys()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!K2:K", list(attr_dict.values()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!M2:M", list(metadata_dict.keys()), "COLUMNS"),
+  #     ValueData(SHEET_ONE_TITLE + "!N2:N", list(metadata_dict.values()), "COLUMNS")
+  # ]
     
     self.format_specs = [
-      FormatData(GridRange(0, 1, 1, 2), 
+      FormatData(CellRange(0, 1, 1, 2), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatData(GridRange(0, 1, 4, 5), 
+      FormatData(CellRange(0, 1, 4, 5), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatData(GridRange(0, 1, 7, 8), 
+      FormatData(CellRange(0, 1, 7, 8), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatData(GridRange(0, 1, 10, 11), 
+      FormatData(CellRange(0, 1, 10, 11), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatData(GridRange(1, len(location_dict) + 1, 0, 1), 
+      FormatData(CellRange(1, len(location_dict) + 1, 0, 1), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatData(GridRange(1, len(features_dict) + 1, 3, 4), 
+      FormatData(CellRange(1, len(features_dict) + 1, 3, 4), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatData(GridRange(1, len(values_dict) + 1, 6, 7), 
+      FormatData(CellRange(1, len(values_dict) + 1, 6, 7), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       ),
-      FormatData(GridRange(1, len(metadata_dict) + 1, 9, 10), 
+      FormatData(CellRange(1, len(metadata_dict) + 1, 9, 10), 
         **{
           FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
           FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
         }
       )
     ]
+
+  def _col_int_to_char(self, col):
+    """Use ASCII numbering to convert column int to letters, e.g., A, AA. Assumes 0-based columns, so adds 1."""
+    result = ""
+    n = col + 1
+    print(f"debug: n is {n}")
+    while n > 0:
+      n, remainder = divmod(n - 1, 26)
+      result = chr(65 + remainder) + result
+    print(f"debug: result is {result}")
+    return result
 
 class PropertyGsheet:
   """Input PropertySpreadsheet and Gsheet, implement update_values() and update_format() to turn ValueData/FormatData into dicts."""
