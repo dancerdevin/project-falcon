@@ -52,7 +52,9 @@ class FormatData:
 # So, like: on the initialization of a PropertyGsheet, build_valuedata and build_formatdata, effectively, FROM the Property, Layout, and Gsheet inputs
 class PropertySpreadsheet:
   def __init__(self, prop: Property, layout: Layout):
+    self.layout = layout
     headers = list(asdict(prop).keys())
+    # NOTE: len(prop_dict.x.rownames) should work for this, but also Selector should do that when implemented for FormatData
     location_dict = asdict(prop.location)
     features_dict = asdict(prop.features)
     values_dict = asdict(prop.values)
@@ -69,17 +71,12 @@ class PropertySpreadsheet:
       # NOTE: OK: here I can use Selectors to grab CellRanges as long as I pass this a Layout, then convert with _col_int_to_char()
       # Find ColumnBlock with rowname, find relevant CellRange with Selector.
       row_name_range_list = RowLabelsByBlock(k).resolve(layout)
-      row_name_range = row_name_range_list[0]
-      start_col_str = self._col_int_to_char(row_name_range.start_col)
-      end_col_str = self._col_int_to_char(row_name_range.end_col)
-      range_str = SHEET_ONE_TITLE + f"!{start_col_str}1:{end_col_str}"
+      start_col_str, end_col_str = self._cellrange_list_to_col_ints(row_name_range_list)
+      range_str = SHEET_ONE_TITLE + f"!{start_col_str}2:{end_col_str}"
       self.value_data_list.append(ValueData(range=range_str, values=list(v.keys()), major_dimension="COLUMNS"))
       value_range_list = ValuesByBlock(k).resolve(layout)
-      value_range = value_range_list[0]
-      # NOTE: repeat code, consolidate
-      start_col_str = self._col_int_to_char(value_range.start_col)
-      end_col_str = self._col_int_to_char(value_range.end_col)
-      range_str = SHEET_ONE_TITLE + f"!{start_col_str}1:{end_col_str}"
+      start_col_str, end_col_str = self._cellrange_list_to_col_ints(value_range_list)
+      range_str = SHEET_ONE_TITLE + f"!{start_col_str}2:{end_col_str}"
       self.value_data_list.append(ValueData(range=range_str, values=list(v.values()), major_dimension="COLUMNS"))
       
 
@@ -158,6 +155,16 @@ class PropertySpreadsheet:
       result = chr(65 + remainder) + result
     print(f"debug: result is {result}")
     return result
+  
+  def _cellrange_list_to_col_ints(self, lst):
+    """Extracts start_col and end_col ints from the first element of a list of CellRanges and adds header_row int."""
+    # TODO: handling multiple CellRanges in a list
+    row_name_range = lst[0]
+    start_col_int = row_name_range.start_col
+    start_col_str = self._col_int_to_char(start_col_int)
+    end_col_int = row_name_range.end_col
+    end_col_str = self._col_int_to_char(end_col_int)
+    return start_col_str, end_col_str
 
 class PropertyGsheet:
   """Input PropertySpreadsheet and Gsheet, implement update_values() and update_format() to turn ValueData/FormatData into dicts."""
