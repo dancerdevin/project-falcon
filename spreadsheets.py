@@ -137,7 +137,7 @@ class ColumnHeaders:
     range_list = []
     for block in layout.blocks:
       # To select the header text and no empty/padding cells, add value_offset to each ColumnBlock's block_index.
-      start_col = layout.block_index[block.name] + block.value_offset
+      start_col = layout.block_start[block.name] + block.value_offset
       range_list.append(CellRange(
         start_row = 0,
         end_row = layout.header_rows,

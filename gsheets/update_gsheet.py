@@ -9,26 +9,19 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
-from spreadsheets import CellRange, Layout, RowLabelsByBlock, ValuesByBlock
+from spreadsheets import Layout, RowLabelsByBlock, ValuesByBlock, FormatRule, FormatSpec, ColumnHeaders
 from property_schema import Property
 
 """
 Populate Google Sheet object with property data by updating values and formatting.
 """
 
-# TODO: reconceive this as plug-ins that receive a Property and Layout. Update_values() will need both, update_format just the latter
-# update_values() will take Property data and use Selectors by Layout block to populate the right values in the right places
-# update_format() will take the Layout and use the All-type Selectors to apply FormatRules and translate them in Gsheets lingo
-# build_valuedata() and build_formatdata() could be the plug-in functionality and feed into update_values()/update_format()
-# NOTE: due to the layers of refactoring, there may be some unnecessary mediation here, but I think that's OK
+# # NOTE: I don't THINK that I need this anymore? This feels like too many layers of abstraction as long as I have a plug-in (or remake as plug-in)
+# class FormatKwarg:
+#   """Expected kwargs for formatting updates using repeat_cell_builder()."""
+#   BG_COLOR = "bg_color"
+#   TEXT_COLOR = "text_color"
 
-# NOTE: I don't THINK that I need this anymore? This feels like too many layers of abstraction as long as I have a plug-in (or remake as plug-in)
-class FormatKwarg:
-  """Expected kwargs for formatting updates using repeat_cell_builder()."""
-  BG_COLOR = "bg_color"
-  TEXT_COLOR = "text_color"
-
-# NOTE: I think it's fine to retain this for my own legibility
 class ValueData:
   """Data required to update values includes cell range as A1 format string, values, and major_dimension (rows or columns)."""
   def __init__(self, range, values, major_dimension):
@@ -39,132 +32,88 @@ class ValueData:
 # NOTE: Let's call this FormatData to distinguish it from FormatSpec/show its paralellism with ValueData
 class FormatData:
   """Data required to update format includes cell range in a tuple of ints and FormatKwargs."""
-  def __init__(self, grid_range, **kwargs):
-    self.grid_range = grid_range
+  def __init__(self, cell_range, **kwargs):
+    self.cell_range = cell_range
     self.kwargs = kwargs
 
-# TODO: OK. first, use my Selector code to generate CellRanges, then translate into A1 format for ValueData, then grab keys() or values() as values,
-# then majorDimension is just whether or not it's the headers on top or not. Then similarly instantiate FormatData with FormatRules using same Selector code.
-# So values can just use Selectors to produce lists of CellRanges and format can use FormatRules to add FormatSpecs TO Selector-drived CellRanges. FormatData
-# CellRanges can also be asdict-ed straight into what Gsheets wants, I think, because those are not in A1 format.
-
-# TODO: what do I NEED from this still? I don't need all these dicts. I will need to translate ranges into A1 format for values.
-# So, like: on the initialization of a PropertyGsheet, build_valuedata and build_formatdata, effectively, FROM the Property, Layout, and Gsheet inputs
 class PropertySpreadsheet:
   def __init__(self, prop: Property, layout: Layout):
     self.layout = layout
-    headers = list(asdict(prop).keys())
-    # NOTE: len(prop_dict.x.rownames) should work for this, but also Selector should do that when implemented for FormatData
-    location_dict = asdict(prop.location)
-    features_dict = asdict(prop.features)
-    values_dict = asdict(prop.values)
-    attr_dict = asdict(prop.attributes)
-    metadata_dict = asdict(prop.metadata)
-
-    # Iteratively generate list of ValueData from Property.
-    self.value_data_list = [ValueData(SHEET_ONE_TITLE + "!B1:1", headers, "ROWS")]
     prop_dict = asdict(prop)
-    # TODO: header value/layout info here
+    headers_list = self._build_gsheets_header_row(prop_dict, layout)
+    format_specs = {
+      "gr_bg_wh_txt": FormatSpec(text_color="white", bg_color="green")
+    }
+
+    # Generate header ValueData and FormatData, then iteratively populate list of ValueData from Property.
+    header_range_list = ColumnHeaders().resolve(layout)
+    start_col_int = header_range_list[0].start_col
+    end_col_int = start_col_int + len(headers_list) - 1 # Headers range must incorporate empty strings for Gsheets
+    start_col_str = self._col_int_to_char(start_col_int)
+    end_col_str = self._col_int_to_char(end_col_int)
+    range_str = SHEET_ONE_TITLE + f"!{start_col_str}1:{end_col_str}"
+    self.value_data_list = [ValueData(range=range_str, values=headers_list, major_dimension="ROWS")]
+    self.format_data_list = []
+    self.format_rules = [FormatRule(format=format_specs["gr_bg_wh_txt"], selector=ColumnHeaders())]
 
     for k, v in prop_dict.items():
       # k is category/column (e.g., location), v is dict of field/rowname and value.
-      # NOTE: OK: here I can use Selectors to grab CellRanges as long as I pass this a Layout, then convert with _col_int_to_char()
       # Find ColumnBlock with rowname, find relevant CellRange with Selector.
       row_name_range_list = RowLabelsByBlock(k).resolve(layout)
-      start_col_str, end_col_str = self._cellrange_list_to_col_ints(row_name_range_list)
+      start_col_str, end_col_str = self._cellrange_list_to_col_strs(row_name_range_list)
       range_str = SHEET_ONE_TITLE + f"!{start_col_str}2:{end_col_str}"
       self.value_data_list.append(ValueData(range=range_str, values=list(v.keys()), major_dimension="COLUMNS"))
       value_range_list = ValuesByBlock(k).resolve(layout)
-      start_col_str, end_col_str = self._cellrange_list_to_col_ints(value_range_list)
+      start_col_str, end_col_str = self._cellrange_list_to_col_strs(value_range_list)
       range_str = SHEET_ONE_TITLE + f"!{start_col_str}2:{end_col_str}"
       self.value_data_list.append(ValueData(range=range_str, values=list(v.values()), major_dimension="COLUMNS"))
-      
-
-  #   self.value_data_list = [
-  #     ValueData(SHEET_ONE_TITLE + "!B1:1", headers, "ROWS"),
-  #     ValueData(SHEET_ONE_TITLE + "!A2:A", list(location_dict.keys()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!B2:B", list(location_dict.values()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!D2:D", list(features_dict.keys()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!E2:E", list(features_dict.values()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!G2:G", list(values_dict.keys()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!H2:H", list(values_dict.values()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!J2:J", list(attr_dict.keys()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!K2:K", list(attr_dict.values()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!M2:M", list(metadata_dict.keys()), "COLUMNS"),
-  #     ValueData(SHEET_ONE_TITLE + "!N2:N", list(metadata_dict.values()), "COLUMNS")
-  # ]
+      # Build the FormatRules here while iterating through the blocks.
+      # NOTE: Hard-coding some simple rules for testing.
+      self.format_rules.append(FormatRule(format=format_specs["gr_bg_wh_txt"], selector=RowLabelsByBlock(k)))
     
-    self.format_specs = [
-      FormatData(CellRange(0, 1, 1, 2), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      ),
-      FormatData(CellRange(0, 1, 4, 5), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      ),
-      FormatData(CellRange(0, 1, 7, 8), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      ),
-      FormatData(CellRange(0, 1, 10, 11), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      ),
-      FormatData(CellRange(1, len(location_dict) + 1, 0, 1), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      ),
-      FormatData(CellRange(1, len(features_dict) + 1, 3, 4), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      ),
-      FormatData(CellRange(1, len(values_dict) + 1, 6, 7), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      ),
-      FormatData(CellRange(1, len(metadata_dict) + 1, 9, 10), 
-        **{
-          FormatKwarg.BG_COLOR: {"red": 0.4156, "green": 0.6588, "blue": 0.3098},
-          FormatKwarg.TEXT_COLOR: {"blue": 1, "red": 1, "green": 1, "alpha": 1}
-        }
-      )
-    ]
+      # Generate FormatData(CellRange, dict)
+      for rule in self.format_rules:
+        cell_ranges = rule.selector.resolve(layout)
+        for cell_range in cell_ranges:
+          self.format_data_list.append(FormatData(
+            cell_range=cell_range,
+            **self._format_spec_to_format_data(rule.format)))
 
   def _col_int_to_char(self, col):
     """Use ASCII numbering to convert column int to letters, e.g., A, AA. Assumes 0-based columns, so adds 1."""
     result = ""
     n = col + 1
-    print(f"debug: n is {n}")
     while n > 0:
       n, remainder = divmod(n - 1, 26)
       result = chr(65 + remainder) + result
-    print(f"debug: result is {result}")
     return result
   
-  def _cellrange_list_to_col_ints(self, lst):
-    """Extracts start_col and end_col ints from the first element of a list of CellRanges and adds header_row int."""
-    # TODO: handling multiple CellRanges in a list
-    row_name_range = lst[0]
-    start_col_int = row_name_range.start_col
+  def _cellrange_list_to_col_strs(self, lst):
+    """Extracts start_col int from the first element of a list of CellRanges and end_col int from last element."""
+    # NOTE: I return one range by referencing the first (leftmost) and last (rightmost) CellRange in the list.
+    # But the mere fact that I can do that likely implies I am doing too much work populating a bunch of micro-ranges for each value subset.
+    # TODO: Review range generation code and ensure I'm not doing more work than I need to be.
+    start_col_int = lst[0].start_col
     start_col_str = self._col_int_to_char(start_col_int)
-    end_col_int = row_name_range.end_col
+    end_col_int = lst[-1].end_col
     end_col_str = self._col_int_to_char(end_col_int)
     return start_col_str, end_col_str
+  
+  def _format_spec_to_format_data(self, formatspec):
+    format_data_kwargs = {}
+    if formatspec.text_color == "white":
+      format_data_kwargs["text_color"] = {"blue": 1, "red": 1, "green": 1, "alpha": 1}
+    if formatspec.bg_color == "green":
+      format_data_kwargs["bg_color"] = {"red": 0.4156, "green": 0.6588, "blue": 0.3098}
+    return format_data_kwargs
+  
+  def _build_gsheets_header_row(self, prop_dict, layout):
+    header_list = []
+    for key in prop_dict.keys():
+      header_list.append(key)
+      offset = layout.block_index[key].width - layout.block_index[key].value_offset
+      header_list += [""] * offset
+    return header_list
 
 class PropertyGsheet:
   """Input PropertySpreadsheet and Gsheet, implement update_values() and update_format() to turn ValueData/FormatData into dicts."""
@@ -172,7 +121,7 @@ class PropertyGsheet:
     self.gsheet = gsheet
     self.gsheet_id = gsheet.spreadsheet.get("spreadsheetId")
     self.value_data_list = propsheet.value_data_list
-    self.format_specs = propsheet.format_specs
+    self.format_data_list = propsheet.format_data_list
 
   def update_values(self):
     """Populate spreadsheet with values using spreadsheet.values().batchUpdate()."""
@@ -191,21 +140,21 @@ class PropertyGsheet:
     ).execute()
     print("spreadsheets.values.batchUpdate executed.")
 
-  def repeat_cell_builder(self, sheet_id, format_spec):
+  def repeat_cell_builder(self, sheet_id, format_data: FormatData):
     """Formatting requests in the Google Sheets API involve many complex nested arrays.
     This helper function unpacks specifications to fit the necessary structure."""
 
-    grid_range = format_spec.grid_range
-    kwargs = format_spec.kwargs
+    cell_range = format_data.cell_range
+    kwargs = format_data.kwargs
     
     repeat_cell = {
       "repeatCell": {
         "range": {
           "sheetId": sheet_id,
-          "startRowIndex": grid_range.start_row,
-          "endRowIndex": grid_range.end_row,
-          "startColumnIndex": grid_range.start_col,
-          "endColumnIndex": grid_range.end_col
+          "startRowIndex": cell_range.start_row,
+          "endRowIndex": cell_range.end_row,
+          "startColumnIndex": cell_range.start_col,
+          "endColumnIndex": cell_range.end_col
         },
         "cell": {"userEnteredFormat": {}},
         "fields": "userEnteredFormat"
@@ -215,12 +164,12 @@ class PropertyGsheet:
     user_format_dict = repeat_cell["repeatCell"]["cell"]["userEnteredFormat"]
     fields_to_append = []
 
-    # Check for dictionaries with kwargs
-    if FormatKwarg.BG_COLOR in kwargs:
+    # TODO: Consider re-implementing FormatKwargs or if just having the string comparisons here is fine
+    if "bg_color" in kwargs:
       user_format_dict["backgroundColor"] = kwargs["bg_color"]
       fields_to_append.append("backgroundColor")
     
-    if FormatKwarg.TEXT_COLOR in kwargs:
+    if "text_color" in kwargs:
       if "textFormat" not in user_format_dict:
         user_format_dict["textFormat"] = {}
       user_format_dict["textFormat"]["foregroundColor"] = kwargs["text_color"]
@@ -230,7 +179,7 @@ class PropertyGsheet:
     repeat_cell["repeatCell"]["fields"] = "userEnteredFormat(" + ",".join(fields_to_append) + ")"
 
     return repeat_cell
-  
+
   def update_format(self):
     """# Format spreadsheet using spreadsheet.batchUpdate(). First get sheet ID"""
     sheet_id = None
@@ -245,7 +194,7 @@ class PropertyGsheet:
     # start_row, end_row, start_col, end_col are unpacked from "range" tuple; dicts like bg_color are unpacked as kwargs.
     format_body = {
       "requests": [
-        self.repeat_cell_builder(sheet_id, spec) for spec in self.format_specs
+        self.repeat_cell_builder(sheet_id, spec) for spec in self.format_data_list
       ]
     }
 
