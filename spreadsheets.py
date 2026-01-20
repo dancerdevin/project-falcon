@@ -55,6 +55,26 @@ class CellRange:
         result = chr(65 + remainder) + result
       cols_as_str.append(result)
     return f"{cols_as_str[0]}{self.start_row + 1}:{cols_as_str[1]}"
+  
+  @staticmethod
+  def get_bounding_range_from_ranges(ranges: List["CellRange"]) -> "CellRange":
+    """From a list of CellRanges, output a CellRange that encompasses them all, starting with min values and ending with max."""
+    return CellRange(
+      start_row = min(range.start_row for range in ranges),
+      end_row = max(range.end_row for range in ranges),
+      start_col = min(range.start_col for range in ranges),
+      end_col = max(range.end_col for range in ranges),
+    )
+  
+  @staticmethod
+  def get_bounding_range_from_layout(layout: "Layout") -> "CellRange":
+    """Returns one big CellRange ranging from upper-left to lower-right corners of Layout, based on total width and longest row_names array."""
+    return CellRange(
+      start_row = layout.header_offset,
+      end_row = max(len(block.row_names) for block in layout.blocks),
+      start_col = min(val for val in layout.block_start.values()), # find leftmost position
+      end_col = max(layout.block_start[block.name] + block.width for block in layout.blocks)
+    )
 
 
 @dataclass(frozen=True)
@@ -73,13 +93,8 @@ class Layout:
   blocks: Sequence[ColumnBlock]
   block_index: dict[str, ColumnBlock] # Pair block name and block obj for easy lookup by name
   block_start: dict[str, int] # Pair block name and upper-left index for relative position
+  header_offset: int
   header_rows: int
-
-  # Get total width of layout for, e.g., HeaderRow Selector
-  # TODO: I don't use this, so instead make it do what I need, which is go from upper left to lower right corner! Longest row_names len...
-  @property
-  def total_width(self) -> int:
-    return max(self.block_start[block.name] + block.width for block in self.blocks)
 
 
 def build_block(col_name, values) -> ColumnBlock:
@@ -105,6 +120,8 @@ def build_layout(prop: Property) -> Layout:
   blocks = [] # list of block objects
   block_index = {} # Pair block names and block objs for easy Selector lookup
   block_start = {} # Pair block names and upper-left indices for relative positioning
+  header_offset = 0
+  header_rows = header_offset + 1
 
   current_col_index = 0
 
@@ -119,7 +136,8 @@ def build_layout(prop: Property) -> Layout:
     blocks = blocks,
     block_index = block_index,
     block_start = block_start,
-    header_rows = 1
+    header_offset = header_offset,
+    header_rows = header_rows
   )
 
 
@@ -153,7 +171,7 @@ class ColumnHeaders:
       # To select the header text and no empty/padding cells, add value_offset to each ColumnBlock's block_index.
       start_col = layout.block_start[block.name] + block.value_offset
       range_list.append(CellRange(
-        start_row = 0,
+        start_row = layout.header_offset,
         end_row = layout.header_rows,
         start_col = start_col,
         end_col = start_col + 1

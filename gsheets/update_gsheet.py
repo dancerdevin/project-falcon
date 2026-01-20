@@ -60,10 +60,11 @@ class PropertySpreadsheet:
       # k is category/column (e.g., location), v is dict of field/rowname and value.
       # Find ColumnBlock with rowname, find relevant CellRange with Selector.
       row_name_range_list = RowLabelsByBlock(k).resolve(layout)
-      range_str = SHEET_ONE_TITLE + "!" + self._cellrange_list_to_col_strs(row_name_range_list)
+      # range_str = SHEET_ONE_TITLE + "!" + self._cellrange_list_to_col_strs(row_name_range_list)
+      range_str = SHEET_ONE_TITLE + "!" + CellRange.get_bounding_range_from_ranges(row_name_range_list).as_string
       self.value_data_list.append(ValueData(range=range_str, values=list(v.keys()), major_dimension="COLUMNS"))
       value_range_list = ValuesByBlock(k).resolve(layout)
-      range_str = SHEET_ONE_TITLE + "!" + self._cellrange_list_to_col_strs(value_range_list)
+      range_str = SHEET_ONE_TITLE + "!" + CellRange.get_bounding_range_from_ranges(value_range_list).as_string
       self.value_data_list.append(ValueData(range=range_str, values=list(v.values()), major_dimension="COLUMNS"))
       # Build the FormatRules here while iterating through the blocks.
       # NOTE: Hard-coding some simple rules for testing.
@@ -76,18 +77,6 @@ class PropertySpreadsheet:
           self.format_data_list.append(FormatData(
             cell_range=cell_range,
             **self._format_spec_to_format_data(rule.format)))
-  
-  def _cellrange_list_to_col_strs(self, lst):
-    """Extracts start_col int from the first element of a list of CellRanges and end_col int from last element."""
-    # NOTE: I return one range by referencing the first (leftmost) and last (rightmost) CellRange in the list.
-    # But the mere fact that I can do that likely implies I am doing too much work populating a bunch of micro-ranges for each value subset.
-    # TODO: Review range generation code and ensure I'm not doing more work than I need to be.
-    big_range = CellRange(1, 1, lst[0].start_col, lst[-1].end_col)
-    # start_col_int = lst[0].start_col
-    # start_col_str = self._col_int_to_char(start_col_int)
-    # end_col_int = lst[-1].end_col
-    # end_col_str = self._col_int_to_char(end_col_int)
-    return big_range.as_string
   
   def _format_spec_to_format_data(self, formatspec):
     format_data_kwargs = {}
