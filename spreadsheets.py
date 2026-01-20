@@ -43,6 +43,19 @@ class CellRange:
   start_col: int
   end_col: int
 
+  @property
+  def as_string(self) -> str:
+    """Use ASCII numbering to convert column int to Excel format/letters, e.g., A, AA. Assumes 0-based columns and rows, so adds 1 to both."""
+    cols_as_str = []
+    for n in (self.start_col, self.end_col):
+      n += 1
+      result = ""
+      while n > 0:
+        n, remainder = divmod(n - 1, 26)
+        result = chr(65 + remainder) + result
+      cols_as_str.append(result)
+    return f"{cols_as_str[0]}{self.start_row + 1}:{cols_as_str[1]}"
+
 
 @dataclass(frozen=True)
 class ColumnBlock:
@@ -63,6 +76,7 @@ class Layout:
   header_rows: int
 
   # Get total width of layout for, e.g., HeaderRow Selector
+  # TODO: I don't use this, so instead make it do what I need, which is go from upper left to lower right corner! Longest row_names len...
   @property
   def total_width(self) -> int:
     return max(self.block_start[block.name] + block.width for block in self.blocks)

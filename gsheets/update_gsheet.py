@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
-from spreadsheets import Layout, RowLabelsByBlock, ValuesByBlock, FormatRule, FormatSpec, ColumnHeaders
+from spreadsheets import CellRange, Layout, RowLabelsByBlock, ValuesByBlock, FormatRule, FormatSpec, ColumnHeaders
 from property_schema import Property
 
 """
@@ -47,11 +47,11 @@ class PropertySpreadsheet:
 
     # Generate header ValueData and FormatData, then iteratively populate list of ValueData from Property.
     header_range_list = ColumnHeaders().resolve(layout)
-    start_col_int = header_range_list[0].start_col
-    end_col_int = start_col_int + len(headers_list) - 1 # Headers range must incorporate empty strings for Gsheets
-    start_col_str = self._col_int_to_char(start_col_int)
-    end_col_str = self._col_int_to_char(end_col_int)
-    range_str = SHEET_ONE_TITLE + f"!{start_col_str}1:{end_col_str}"
+    header_range = header_range_list[0]
+    header_end_col = header_range.start_col + len(headers_list) - 1 # Headers range must incorporate empty strings for Gsheets
+    updated_header_range = CellRange(header_range.start_row, header_range.end_row, header_range.start_col, header_end_col)
+    header_range_as_str = updated_header_range.as_string
+    range_str = SHEET_ONE_TITLE + "!" + header_range_as_str
     self.value_data_list = [ValueData(range=range_str, values=headers_list, major_dimension="ROWS")]
     self.format_data_list = []
     self.format_rules = [FormatRule(format=format_specs["gr_bg_wh_txt"], selector=ColumnHeaders())]
@@ -60,12 +60,10 @@ class PropertySpreadsheet:
       # k is category/column (e.g., location), v is dict of field/rowname and value.
       # Find ColumnBlock with rowname, find relevant CellRange with Selector.
       row_name_range_list = RowLabelsByBlock(k).resolve(layout)
-      start_col_str, end_col_str = self._cellrange_list_to_col_strs(row_name_range_list)
-      range_str = SHEET_ONE_TITLE + f"!{start_col_str}2:{end_col_str}"
+      range_str = SHEET_ONE_TITLE + "!" + self._cellrange_list_to_col_strs(row_name_range_list)
       self.value_data_list.append(ValueData(range=range_str, values=list(v.keys()), major_dimension="COLUMNS"))
       value_range_list = ValuesByBlock(k).resolve(layout)
-      start_col_str, end_col_str = self._cellrange_list_to_col_strs(value_range_list)
-      range_str = SHEET_ONE_TITLE + f"!{start_col_str}2:{end_col_str}"
+      range_str = SHEET_ONE_TITLE + "!" + self._cellrange_list_to_col_strs(value_range_list)
       self.value_data_list.append(ValueData(range=range_str, values=list(v.values()), major_dimension="COLUMNS"))
       # Build the FormatRules here while iterating through the blocks.
       # NOTE: Hard-coding some simple rules for testing.
@@ -78,26 +76,18 @@ class PropertySpreadsheet:
           self.format_data_list.append(FormatData(
             cell_range=cell_range,
             **self._format_spec_to_format_data(rule.format)))
-
-  def _col_int_to_char(self, col):
-    """Use ASCII numbering to convert column int to letters, e.g., A, AA. Assumes 0-based columns, so adds 1."""
-    result = ""
-    n = col + 1
-    while n > 0:
-      n, remainder = divmod(n - 1, 26)
-      result = chr(65 + remainder) + result
-    return result
   
   def _cellrange_list_to_col_strs(self, lst):
     """Extracts start_col int from the first element of a list of CellRanges and end_col int from last element."""
     # NOTE: I return one range by referencing the first (leftmost) and last (rightmost) CellRange in the list.
     # But the mere fact that I can do that likely implies I am doing too much work populating a bunch of micro-ranges for each value subset.
     # TODO: Review range generation code and ensure I'm not doing more work than I need to be.
-    start_col_int = lst[0].start_col
-    start_col_str = self._col_int_to_char(start_col_int)
-    end_col_int = lst[-1].end_col
-    end_col_str = self._col_int_to_char(end_col_int)
-    return start_col_str, end_col_str
+    big_range = CellRange(1, 1, lst[0].start_col, lst[-1].end_col)
+    # start_col_int = lst[0].start_col
+    # start_col_str = self._col_int_to_char(start_col_int)
+    # end_col_int = lst[-1].end_col
+    # end_col_str = self._col_int_to_char(end_col_int)
+    return big_range.as_string
   
   def _format_spec_to_format_data(self, formatspec):
     format_data_kwargs = {}

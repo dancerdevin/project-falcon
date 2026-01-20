@@ -18,7 +18,7 @@ API_NAME = "sheets"
 API_VERSION = "v4"
 
 # Spreadsheet constants, e.g., title
-SPREADSHEET_TITLE = "PropObj Test v5.4"
+SPREADSHEET_TITLE = "PropObj Test v6.6"
 SHEET_ONE_TITLE = "Test Sheet"
 
 
