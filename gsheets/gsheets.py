@@ -22,11 +22,11 @@ def main():
   # address_dict = address_data_to_gsheet(ADDRESS_STRING, DATETIME_STRING)
   prop_list = build_properties("2025-10-10_12-42-27", "2025-10-22_13-42")
   prop_obj = prop_list[0]
-  layout = build_layout(prop_obj)
+  # layout = build_layout(prop_obj)
 
   client = GoogleSheetsAPIClient()
   gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
-  prop_sheet = PropertySpreadsheet(prop_obj, layout)
+  prop_sheet = PropertySpreadsheet(prop_obj)
   property_gsheet = PropertyGsheet(prop_sheet, gsheet)
   property_gsheet.update_values()
   property_gsheet.update_format()

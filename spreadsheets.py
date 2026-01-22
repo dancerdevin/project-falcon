@@ -67,10 +67,16 @@ class CellRange:
     )
   
   @staticmethod
-  def get_bounding_range_from_layout(layout: "Layout") -> "CellRange":
-    """Returns one big CellRange ranging from upper-left to lower-right corners of Layout, based on total width and longest row_names array."""
+  def get_bounding_range_from_layout(layout: "Layout", with_headers: bool=1) -> "CellRange":
+    """Returns one big CellRange ranging from upper-left to lower-right corners of Layout, based on total width and longest row_names array.
+    The with_header parameter defaults to including full Layout and setting to 0 outputs the entire Layout except the header rows."""
+    if not with_headers:
+      start_row = layout.header_offset + layout.header_rows
+    else:
+      start_row = layout.header_offset
+
     return CellRange(
-      start_row = layout.header_offset,
+      start_row = start_row,
       end_row = max(len(block.row_names) for block in layout.blocks),
       start_col = min(val for val in layout.block_start.values()), # find leftmost position
       end_col = max(layout.block_start[block.name] + block.width for block in layout.blocks)
@@ -96,49 +102,50 @@ class Layout:
   header_offset: int
   header_rows: int
 
+  @staticmethod
+  def build_block(col_name, values) -> ColumnBlock:
+    """Each block represents the column header, row names, contents, and spacing/padding."""
+    # NOTE: This could be a build_layout() helper method, but in case I want to build a single block somewhere, it's on Layout.
 
-def build_block(col_name, values) -> ColumnBlock:
-  """Each block represents the column header, row names, contents, and spacing/padding."""
+    row_names = list(values.keys()) # The values() are dicts where the keys are row names
 
-  row_names = list(values.keys()) # The values() are dicts where the keys are row names
+    return ColumnBlock(
+      name = col_name,
+      row_names = row_names,
+      label_offset = 0,
+      value_offset = 1,
+      width = 3 # Label + value + spacing
+    )
 
-  return ColumnBlock(
-    name = col_name,
-    row_names = row_names,
-    label_offset = 0,
-    value_offset = 1,
-    width = 3 # Label + value + spacing
-  )
+  @staticmethod
+  def build_layout(prop: Property) -> "Layout":
+    """Design a dynamic layout with a block per column, each having variable row depth per number of fields."""
+    if not isinstance(prop, Property):
+      raise Exception("Error: build_layout expects Property object input.")
+    
+    values = asdict(prop) # Render Property dataclass as nested dict
+    blocks = [] # list of block objects
+    block_index = {} # Pair block names and block objs for easy Selector lookup
+    block_start = {} # Pair block names and upper-left indices for relative positioning
+    header_offset = 0
+    header_rows = header_offset + 1
 
+    current_col_index = 0
 
-def build_layout(prop: Property) -> Layout:
-  """Design a dynamic layout with a block per column, each having variable row depth per number of fields."""
-  if not isinstance(prop, Property):
-    raise Exception("Error: build_layout expects Property object input.")
-  
-  values = asdict(prop) # Render Property dataclass as nested dict
-  blocks = [] # list of block objects
-  block_index = {} # Pair block names and block objs for easy Selector lookup
-  block_start = {} # Pair block names and upper-left indices for relative positioning
-  header_offset = 0
-  header_rows = header_offset + 1
+    for column in values.keys():
+      block = Layout.build_block(column, values[column])
+      blocks.append(block)
+      block_index[block.name] = block
+      block_start[block.name] = current_col_index
+      current_col_index += block.width
 
-  current_col_index = 0
-
-  for column in values.keys():
-    block = build_block(column, values[column])
-    blocks.append(block)
-    block_index[block.name] = block
-    block_start[block.name] = current_col_index
-    current_col_index += block.width
-
-  return Layout(
-    blocks = blocks,
-    block_index = block_index,
-    block_start = block_start,
-    header_offset = header_offset,
-    header_rows = header_rows
-  )
+    return Layout(
+      blocks = blocks,
+      block_index = block_index,
+      block_start = block_start,
+      header_offset = header_offset,
+      header_rows = header_rows
+    )
 
 
 class Selector(Protocol):

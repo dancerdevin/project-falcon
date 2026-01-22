@@ -16,7 +16,7 @@ assert isinstance(prop_obj, Property), "The elements of the build_properties ret
 # prop_bundle = prop_list[0].to_dict()
 # assert isinstance(prop_bundle, dict), "The as_bundle() method on a Property object should return a dict"
 
-test_layout = build_layout(prop_obj)
+test_layout = Layout.build_layout(prop_obj)
 # assert len(test_layout.blocks.keys()) > 0, "The column_names list should be populated"
 
 test_spec = FormatSpec(text_color="white", bg_color="green")
