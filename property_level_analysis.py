@@ -1,11 +1,12 @@
 import pandas as pd
-import numpy as np
+from numpy import float64
 from enum import StrEnum
 from json_loading import json_to_df, json_to_list_of_dicts
 from property_data_intake import rentometer_api
 from datetime import datetime
 from amortization.amount import calculate_amortization_amount
 from property_schema import Property, LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, Metadata
+from typing import Dict
 
 # TODO: currently: unpack list of property objects into dict to send to gsheet output
 # then/or create Spreadsheet object to store formatting information and also plug THAT in
@@ -20,15 +21,18 @@ class ExpectedColumns(StrEnum):
     PROPERTY_TAX = "property_tax"
 
 
-def build_properties(rentcast_datetime_string=None, rentometer_datetime_string=None) -> list:
+def build_properties(rentcast_data, rentometer_data) -> list:
     """Assemble list of Property objects populated by LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, and Metadata objects."""
-    df = parse_rentcast_data(rentcast_datetime_string)
+    df = parse_rentcast_data(rentcast_data)
+    print(f"Stage 1: {df.head()}")
 
     # Aggregate Rentometer data into Rentcast data.
-    df_with_rent = add_rent_to_parsed_rentcast_data(df, rentometer_datetime_string)
+    df_with_rent = add_rent_to_parsed_rentcast_data(df, rentometer_data)
+    print(f"Stage 2: {df_with_rent.head()}")
 
     # While data remains in Pandas DataFrame/Series form, perform calculations by column.
     df_with_rent_and_costs = add_costs_to_parsed_rentcast_data(df_with_rent)
+    print(f"Stage 3: {df_with_rent_and_costs.head()}")
 
     # Then, use itertuples() to efficiently treat each row as a property by turning them into NamedTuples.
     prop_list = []
@@ -40,6 +44,8 @@ def build_properties(rentcast_datetime_string=None, rentometer_datetime_string=N
         value_details = build_values(row)
         metadata = build_metadata(row)
         prop_list.append(Property(location_details, feature_details, attribute_details, value_details, metadata))
+
+    print(f"Prop_list: {prop_list}")
 
     return prop_list
 
@@ -103,9 +109,7 @@ def build_metadata(row) -> Metadata:
     )
 
 
-def parse_rentcast_data(datetime=None):
-    # Use json_to_df to parse rentcast data for initial desired inputs. Returns dict subset.
-    df = json_to_df("rentcast", datetime)
+def parse_rentcast_data(df):
     max_value = 550000
     min_bedrooms = 3
     min_bathrooms = 1.5
@@ -129,26 +133,40 @@ def parse_rentcast_data(datetime=None):
     return subset_df
 
 
-def add_rent_to_parsed_rentcast_data(parsed_data, datetime_string=None):
+def add_rent_to_parsed_rentcast_data(rentcast_data, rentometer_data):
     # For each address in parsed rentcast data, find rent data, add as expected income, and return dataframe.
-    if ExpectedColumns.PROPERTY_TAX not in parsed_data.columns.to_list():
+    if ExpectedColumns.PROPERTY_TAX not in rentcast_data.columns.to_list():
         raise Exception("Error: property tax column missing. First call rentcast_data_parser on dataframe input.")
     
     # If I've specified a datetime, the JSON dumps already exist on disk. If not, make necessary API calls.
     # For each address in the parsed_data, apply rentometer_api function in property_data.
-    if datetime_string is None:
-        datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parsed_data["formattedAddress"].apply(rentometer_api)
+    # if datetime_string is None:
+    #     datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    #     parsed_data["formattedAddress"].apply(rentometer_api)
 
     # Load JSON dumps saved to disk from relevant datetime (right before making API calls) and concatenate into dataframe.
-    rent_data = json_to_df("rentometer", datetime_string)
-    subset_rent_data = rent_data[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
+    # rent_data = json_to_df("rentometer", datetime_string)
+    subset_rent_data = rentometer_data[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
     subset_rent_data = subset_rent_data.rename(columns={"quickview_url": "rentometer_url"})
     subset_rent_data = subset_rent_data.drop_duplicates()
 
+    # Convert relevant columns to matching floats
+    cols_to_convert = ["median", "min", "max"]
+    subset_rent_data[cols_to_convert] = subset_rent_data[cols_to_convert].astype(float64)
+
     # Match addresses between parsed_data and new Rentometer JSON dumps, add Rentometer data, and return.
-    parsed_data = parsed_data.rename(columns={"formattedAddress": "address"})
-    joined_data = pd.merge(parsed_data, subset_rent_data, on="address", how="inner") # Presumes exact same address string
+    rentcast_data = rentcast_data.rename(columns={"formattedAddress": "address"})
+    rentcast_data["address"] = rentcast_data["address"].astype(str)
+    subset_rent_data["address"] = subset_rent_data["address"].astype(str)
+    
+    # Debug: check for matching addresses
+    rentcast_addresses = set(rentcast_data["address"].unique())
+    rentometer_addresses = set(subset_rent_data["address"].unique())
+    print(f"Rentcast addresses: {rentcast_addresses}")
+    print(f"Rentometer addresses: {rentometer_addresses}")
+    print(f"Common addresses: {rentcast_addresses & rentometer_addresses}")
+    
+    joined_data = pd.merge(rentcast_data, subset_rent_data, on="address", how="inner") # Presumes exact same address string
     return joined_data
 
 

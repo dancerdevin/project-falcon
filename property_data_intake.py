@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from datetime import datetime
 from geopy.geocoders import Nominatim
 import math
+import pandas as pd
+from json_loading import json_to_df
 
 
 load_dotenv() # Load API keys
@@ -13,6 +15,14 @@ geolocator = Nominatim(user_agent="peregrin_app") # Instantiate address-finder
 
 # TODO: Property class with data for property_level_analysis.py (init, str, repr) [now in property_schema.py]
 # TODO: Locale class?
+
+VALID_OUTPUTS = [
+    "dump_to_disk_no_pub",      # Call API, save to disk, stop there
+    "dump_to_disk_then_pub",    # Call API, save to disk, then pass on to Gsheets
+    "direct_to_gsheets",        # Call API, don't save to disk, pass on to Gsheets
+    "from_json_dump"            # Do not call API, pass existing JSON dump to Gsheets
+]
+
 
 def lat_long_from_zip(zip_code):
     # Return central latitude and longitude for a given ZIP code, for use in API calls.
@@ -63,7 +73,7 @@ def closest_address_to_lat_long(latitude, longitude):
         raise Exception("Error: Geolocator did not return a valid location.")
     
 
-def api_call_for_json_dump(url, params, name_string, headers={}):
+def api_call_for_json(url, params, name_string, headers={}, save_to_disk=True):
     # Centralized meta-function for API calls. Writes .json file to disk.
     try:
         response = requests.get(url, params=params, headers=headers)
@@ -73,8 +83,11 @@ def api_call_for_json_dump(url, params, name_string, headers={}):
         datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         output_name = f"{name_string}_{datetime_string}.json"
 
-        with open(output_name, "w") as f:
-            json.dump(data, f, indent=4)
+        if save_to_disk:
+            with open(output_name, "w") as f:
+                json.dump(data, f, indent=4)
+
+        return data
 
     except requests.exceptions.RequestException as err:
         print(f"Error: {err}")
@@ -82,19 +95,28 @@ def api_call_for_json_dump(url, params, name_string, headers={}):
 
 def multiple_rentcast_calls_with_offset(URL, params, headers, results, output):
     number_of_calls = math.ceil(results / 500)
+    # TODO: incorporate redundant code into json_loading functionality
+    df_list = []
     for i in range(1, number_of_calls):
         params["offset"] = str(i * 500)
         print("Attempting API call with offset of " + params["offset"])
-        if output == "json":
-            api_call_for_json_dump(URL, params, "rentcast", headers)
+        save_to_disk = True if output == "dump_to_disk" else False
+        data = api_call_for_json(URL, params, "rentcast", headers, save_to_disk)
+        with open(data, "r", encoding="utf-8-sig") as json_dump:
+            print(f"Concatenating data subset {i} to dataframe")
+            df = pd.read_json(json_dump)
+    df_list.append(df)
+    complete_df = pd.concat(df_list, ignore_index=True)
+    return complete_df
 
 
-def rentometer_api(location, output="json", from_cache=False):
+
+def rentometer_api(location, output=""):
     # Write JSON dump from Rentometer API call.
     print("Calling rentometer API function for " + str(location))
     API_KEY = os.getenv("RENTOMETER_API_KEY")
     URL = "https://www.rentometer.com/api/v1/summary"
-    result = ""
+    data = None
 
     default_params = {
         "api_key": API_KEY,
@@ -105,22 +127,23 @@ def rentometer_api(location, output="json", from_cache=False):
 
     params = location_params(location, default_params)
 
-    if output == "json":
-        if not from_cache:
-            api_call_for_json_dump(URL, params, "rentometer")
-            result = "JSON saved to disk"
-        else:
-            # For testing purposes, just return a filename string to load an already saved JSON
-            result = "2026-01-30_10-26-09"
+    if not output:
+        raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
+    elif output == "from_json_dump":
+        # For testing purposes, just return a filename string to load an already saved JSON
+        data = json_to_df("rentometer", "")
+    else:
+        save_to_disk = False if output == "direct_to_gsheets" else True
+        data = api_call_for_json(URL, params, "rentometer", save_to_disk)
+            
+    return data
 
-    return result
 
-
-def rentcast_api(location, results=500, output="json", from_cache=False):
+def rentcast_api(location, results=500, output=""):
     # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
     URL = "https://api.rentcast.io/v1/properties"
-    result = ""
+    data = None
 
     default_params = {
         "api_key": API_KEY,
@@ -142,15 +165,16 @@ def rentcast_api(location, results=500, output="json", from_cache=False):
         multiple_rentcast_calls_with_offset(URL, params, headers, results, output)
     else:
         params["limit"] = results
-        if output == "json":
-            if not from_cache:
-                api_call_for_json_dump(URL, params, "rentcast", headers)
-                result = "JSON saved to disk"
-            else:
-                # For testing purposes, just return a filename string to load an already saved JSON
-                result = "2025-10-09_16-22-59"
+        if not output:
+            raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
+        elif output == "from_json_dump":
+            # For testing purposes, just return a filename string to load an already saved JSON
+            data = json_to_df("rentcast", "")
+        else:
+            save_to_disk = False if output == "direct_to_gsheets" else True
+            data = api_call_for_json(URL, params, "rentcast", save_to_disk)
 
-    return result
+    return data
 
 
 def parse_rentcast_json_by_zip(data, zipcode):
