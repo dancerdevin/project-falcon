@@ -80,17 +80,18 @@ def api_call_for_json_dump(url, params, name_string, headers={}):
         print(f"Error: {err}")
 
 
-def multiple_rentcast_calls_with_offset(URL, params, headers, results):
+def multiple_rentcast_calls_with_offset(URL, params, headers, results, output):
     number_of_calls = math.ceil(results / 500)
     for i in range(1, number_of_calls):
         params["offset"] = str(i * 500)
         print("Attempting API call with offset of " + params["offset"])
-        api_call_for_json_dump(URL, params, "rentcast", headers)
+        if output == "json":
+            api_call_for_json_dump(URL, params, "rentcast", headers)
 
 
-def rentometer_api(location):
+def rentometer_api(location, output="json"):
     # Write JSON dump from Rentometer API call.
-    print("Calling rentometer API function for " + location)
+    print("Calling rentometer API function for " + str(location))
     API_KEY = os.getenv("RENTOMETER_API_KEY")
     URL = "https://www.rentometer.com/api/v1/summary"
 
@@ -103,10 +104,11 @@ def rentometer_api(location):
 
     params = location_params(location, default_params)
 
-    api_call_for_json_dump(URL, params, "rentometer")
+    if output == "json":
+        api_call_for_json_dump(URL, params, "rentometer")
 
 
-def rentcast_api(location, results=500):
+def rentcast_api(location, results=500, output="json"):
     # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
     URL = "https://api.rentcast.io/v1/properties"
@@ -128,10 +130,11 @@ def rentcast_api(location, results=500):
         raise Exception("Error: please input a valid integer for the number of results requested.")
     elif results > 500:
         print("Offset required, as result exceeds limit of 500. Attempting multiple calls.")
-        multiple_rentcast_calls_with_offset(URL, params, headers, results)
+        multiple_rentcast_calls_with_offset(URL, params, headers, results, output)
     else:
         params["limit"] = results
-        api_call_for_json_dump(URL, params, "rentcast", headers)
+        if output == "json":
+            api_call_for_json_dump(URL, params, "rentcast", headers)
 
 
 def parse_rentcast_json_by_zip(data, zipcode):
