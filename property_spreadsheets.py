@@ -35,7 +35,7 @@ class ValueData:
 @dataclass
 class FormatData:
   """FormatData stores a FormatRule's FormatSpec as a dict and the CellRange output of applying a FormatRule's Selector to a Layout."""
-  range: List[CellRange]
+  range_list: List[CellRange]
   spec: dict
 
   @staticmethod

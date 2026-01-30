@@ -89,11 +89,12 @@ def multiple_rentcast_calls_with_offset(URL, params, headers, results, output):
             api_call_for_json_dump(URL, params, "rentcast", headers)
 
 
-def rentometer_api(location, output="json"):
+def rentometer_api(location, output="json", from_cache=False):
     # Write JSON dump from Rentometer API call.
     print("Calling rentometer API function for " + str(location))
     API_KEY = os.getenv("RENTOMETER_API_KEY")
     URL = "https://www.rentometer.com/api/v1/summary"
+    result = ""
 
     default_params = {
         "api_key": API_KEY,
@@ -105,13 +106,21 @@ def rentometer_api(location, output="json"):
     params = location_params(location, default_params)
 
     if output == "json":
-        api_call_for_json_dump(URL, params, "rentometer")
+        if not from_cache:
+            api_call_for_json_dump(URL, params, "rentometer")
+            result = "JSON saved to disk"
+        else:
+            # For testing purposes, just return a filename string to load an already saved JSON
+            result = "2026-01-30_10-26-09"
+
+    return result
 
 
-def rentcast_api(location, results=500, output="json"):
+def rentcast_api(location, results=500, output="json", from_cache=False):
     # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
     URL = "https://api.rentcast.io/v1/properties"
+    result = ""
 
     default_params = {
         "api_key": API_KEY,
@@ -134,7 +143,14 @@ def rentcast_api(location, results=500, output="json"):
     else:
         params["limit"] = results
         if output == "json":
-            api_call_for_json_dump(URL, params, "rentcast", headers)
+            if not from_cache:
+                api_call_for_json_dump(URL, params, "rentcast", headers)
+                result = "JSON saved to disk"
+            else:
+                # For testing purposes, just return a filename string to load an already saved JSON
+                result = "2025-10-09_16-22-59"
+
+    return result
 
 
 def parse_rentcast_json_by_zip(data, zipcode):

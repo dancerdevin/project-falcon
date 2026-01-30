@@ -1,5 +1,5 @@
-from gsheets_client import SHEET_ONE_TITLE
-from create_gsheet import GoogleSheet
+from .gsheets_client import SHEET_ONE_TITLE
+from .create_gsheet import GoogleSheet
 from dataclasses import asdict
 import os
 import sys
@@ -111,7 +111,7 @@ class PropertyGsheet:
     Because FormatData may select multiple ranges to apply the same specification, returns a list of 'repeat_cell' dictionaries to be cumulatively appended to
     one big list that update_format() iterates through."""
 
-    ranges = format_data.range
+    ranges = format_data.range_list
     kwargs = format_data.spec
 
     repeat_cell_list = []
