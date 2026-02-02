@@ -10,7 +10,7 @@ class ExpectedAPIs(StrEnum):
     PROPERTY_AGG_ANALYSIS = "property_aggregate_analysis"
 
 
-def json_to_df(api=None, datetime=None):
+def json_to_df_from_disk(api=None, datetime=None):
     files = assemble_json_file_string(api, datetime)
 
     df_list = []

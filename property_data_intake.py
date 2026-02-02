@@ -7,7 +7,8 @@ from datetime import datetime
 from geopy.geocoders import Nominatim
 import math
 import pandas as pd
-from json_loading import json_to_df
+from json_loading import json_to_df_from_disk
+from io import StringIO
 
 
 load_dotenv() # Load API keys
@@ -73,7 +74,7 @@ def closest_address_to_lat_long(latitude, longitude):
         raise Exception("Error: Geolocator did not return a valid location.")
     
 
-def api_call_for_json(url, params, name_string, headers={}, save_to_disk=True):
+def api_call_for_json(url, params, name_string, save_to_disk=True, headers={}):
     # Centralized meta-function for API calls. Writes .json file to disk.
     try:
         response = requests.get(url, params=params, headers=headers)
@@ -87,7 +88,11 @@ def api_call_for_json(url, params, name_string, headers={}, save_to_disk=True):
             with open(output_name, "w") as f:
                 json.dump(data, f, indent=4)
 
-        return data
+        # Convert to DF
+        json_file = StringIO(json.dumps(data))
+        df = pd.read_json(json_file)
+
+        return df
 
     except requests.exceptions.RequestException as err:
         print(f"Error: {err}")
@@ -131,10 +136,10 @@ def rentometer_api(location, output=""):
         raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
     elif output == "from_json_dump":
         # For testing purposes, just return a filename string to load an already saved JSON
-        data = json_to_df("rentometer", "")
+        data = json_to_df_from_disk("rentometer", "")
     else:
         save_to_disk = False if output == "direct_to_gsheets" else True
-        data = api_call_for_json(URL, params, "rentometer", save_to_disk)
+        data = api_call_for_json(URL, params, "rentometer", save_to_disk=save_to_disk)
             
     return data
 
@@ -169,10 +174,10 @@ def rentcast_api(location, results=500, output=""):
             raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
         elif output == "from_json_dump":
             # For testing purposes, just return a filename string to load an already saved JSON
-            data = json_to_df("rentcast", "")
+            data = json_to_df_from_disk("rentcast", "")
         else:
             save_to_disk = False if output == "direct_to_gsheets" else True
-            data = api_call_for_json(URL, params, "rentcast", save_to_disk)
+            data = api_call_for_json(URL, params, "rentcast", headers=headers, save_to_disk=save_to_disk)
 
     return data
 

@@ -14,9 +14,7 @@ def zipcode_to_output(zip: int, output):
     lat_long = lat_long_from_zip(zip)
     # address = closest_address_to_lat_long(latitude, longitude)
     rentometer_result = rentometer_api(lat_long, output)
-    print(rentometer_result.head())
     rentcast_result = rentcast_api(98408, 100, output)
-    print(rentcast_result.head())
     # parse_rentcast_json_by_zip("rentcast_2025-10-09_16-22-59.json", 98408)
     # rentometer_api("6478 S M St, Tacoma, WA 98408")
 

@@ -1,7 +1,7 @@
 import pandas as pd
 from numpy import float64
 from enum import StrEnum
-from json_loading import json_to_df, json_to_list_of_dicts
+from json_loading import json_to_df_from_disk, json_to_list_of_dicts
 from property_data_intake import rentometer_api
 from datetime import datetime
 from amortization.amount import calculate_amortization_amount
@@ -215,7 +215,7 @@ def property_analysis_to_json(agg_data):
 
 
 def find_address_in_property_analysis_json(address_string, datetime_string=None):
-    df = json_to_df("property_aggregate_analysis", datetime_string)
+    df = json_to_df_from_disk("property_aggregate_analysis", datetime_string)
     subset_df = df[df["address"].str.contains(address_string, case=False, na=False)]
     return subset_df
 
