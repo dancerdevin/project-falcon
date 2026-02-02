@@ -7,14 +7,15 @@ from gsheets.create_gsheet import GoogleSheet
 from gsheets.update_gsheet import PropertySpreadsheet, PropertyGsheet
 
 
-def zipcode_to_output(zip: int, output):
+def zipcode_to_output(location, output):
     if output not in VALID_OUTPUTS:
         raise Exception("Error: requested output not in list of valid outputs.")
     
-    lat_long = lat_long_from_zip(zip)
+    # TODO: confirm in what context I need to go zip -> lat_long -> address? For Rentometer?
+    # lat_long = lat_long_from_zip(zip)
     # address = closest_address_to_lat_long(latitude, longitude)
-    rentometer_result = rentometer_api(lat_long, output)
-    rentcast_result = rentcast_api(98408, 100, output)
+    rentometer_result = rentometer_api(location, output)
+    rentcast_result = rentcast_api(location, 100, output)
     # parse_rentcast_json_by_zip("rentcast_2025-10-09_16-22-59.json", 98408)
     # rentometer_api("6478 S M St, Tacoma, WA 98408")
 
@@ -33,4 +34,4 @@ def zipcode_to_output(zip: int, output):
 
 if __name__ == "__main__":
    # zipcode_to_output(98408, "from_json_dump")
-   zipcode_to_output(98408, "direct_to_gsheets")
+   zipcode_to_output('5214 S Thompson Ave, Tacoma, WA 98408', "direct_to_gsheets")

@@ -91,6 +91,7 @@ def api_call_for_json(url, params, name_string, save_to_disk=True, headers={}):
         # Convert to DF
         json_file = StringIO(json.dumps(data))
         df = pd.read_json(json_file)
+        df["filename"] = ""
 
         return df
 
@@ -109,7 +110,7 @@ def multiple_rentcast_calls_with_offset(URL, params, headers, results, output):
         data = api_call_for_json(URL, params, "rentcast", headers, save_to_disk)
         with open(data, "r", encoding="utf-8-sig") as json_dump:
             print(f"Concatenating data subset {i} to dataframe")
-            df = pd.read_json(json_dump)
+            df = pd.read_json(StringIO(json_dump))
     df_list.append(df)
     complete_df = pd.concat(df_list, ignore_index=True)
     return complete_df
