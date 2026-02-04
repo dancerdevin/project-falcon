@@ -2,15 +2,6 @@ from dataclasses import dataclass, field, fields
 from typing import Optional, List
 from abc import ABC
 
-# TODO: route data intake (from Rentcast and Rentometer) into Property objects
-# Next time: review what data is coming from where, what sort of dict results, and refactor to parse into Details objects.
-# A Property object will be instantiated from Details presumably instantiated at different stages, e.g., analysis -> ValueDetails.
-# TODO: design Spreadsheet objects similarly to provide formatting information to API clients
-# TODO: design API Client abstract base class to expect PropertyBundles and SpreadsheetBundles
-# TODO: scour the details of the refactored Gsheet plug-in to, e.g., receive Property data bundled as dicts and not "address_dict"
-
-# NOTE: Data provider interface: swap from JSON dumps to live API calls without losing past code (maybe I'll want JSON dumps later!)
-# I'll need to study how to hook up both sender and recipient to an interface, but that's what I want to learn.
 
 class PropertyData(ABC):
     """Methods shared by Property objects and their component classes, e.g., LocationDetails. Currently, data validation."""
