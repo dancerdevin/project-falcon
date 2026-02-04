@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass, field, fields
+from typing import Optional, List
+from abc import ABC
 
 # TODO: route data intake (from Rentcast and Rentometer) into Property objects
 # Next time: review what data is coming from where, what sort of dict results, and refactor to parse into Details objects.
@@ -11,8 +12,16 @@ from typing import Optional
 # NOTE: Data provider interface: swap from JSON dumps to live API calls without losing past code (maybe I'll want JSON dumps later!)
 # I'll need to study how to hook up both sender and recipient to an interface, but that's what I want to learn.
 
+class PropertyData(ABC):
+    """Methods shared by Property objects and their component classes, e.g., LocationDetails. Currently, data validation."""
+    def missing_fields(self) -> List[str]:
+        return [field.name for field in fields(self) if getattr(self, field.name) is None]
+    
+    def is_complete(self) -> bool:
+        return len(self.missing_fields()) == 0
+
 @dataclass
-class LocationDetails:
+class LocationDetails(PropertyData):
     """Subset of Property data relevant to location."""
     street_address: Optional[str] = None
     city: Optional[str] = None
@@ -24,7 +33,7 @@ class LocationDetails:
 
 
 @dataclass
-class FeatureDetails:
+class FeatureDetails(PropertyData):
     """Property features, such as number of beds/baths."""
     property_type: Optional[str] = None
     bedrooms: Optional[int] = None
@@ -34,7 +43,7 @@ class FeatureDetails:
 
 
 @dataclass
-class AttributeDetails:
+class AttributeDetails(PropertyData):
     """Property facts not included in features, such as year built."""
     year_built: Optional[int] = None
     assessor_ID: Optional[int] = None
@@ -43,7 +52,7 @@ class AttributeDetails:
 
 
 @dataclass
-class ValueDetails:
+class ValueDetails(PropertyData):
     """Values pertaining to expected revenue and costs."""
     value_est: Optional[int] = None
     property_tax: Optional[float] = None
@@ -60,23 +69,17 @@ class ValueDetails:
 
 
 @dataclass    
-class Metadata:
+class Metadata(PropertyData):
     filename: Optional[str] = None
     rentometer_url: Optional[str] = None
     rentcast_url: Optional[str] = None
 
 
 @dataclass
-class Property:
+class Property(PropertyData):
     """Domain model containing subsets of property data."""
     location: Optional[LocationDetails] = field(default_factory=LocationDetails)
     features: Optional[FeatureDetails] = field(default_factory=FeatureDetails)
     attributes: Optional[AttributeDetails] = field(default_factory=AttributeDetails)
     values: Optional[ValueDetails] = field(default_factory=ValueDetails)
     metadata: Optional[Metadata] = field(default_factory=Metadata)
-    
-
-# NOTE: this needs to be recreated at the API client manager level, currently does not exist in tests.py
-"""Protocol to enable API client manager to type-check that a bundle is being passed. Just one for now."""    
-# class NeedsNestedPropertyInfo(Protocol):
-#     def extract(self, prop: Property) -> tuple[dict, tuple]: ...
