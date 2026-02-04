@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 
 # TODO: route data intake (from Rentcast and Rentometer) into Property objects
 # Next time: review what data is coming from where, what sort of dict results, and refactor to parse into Details objects.
@@ -13,66 +14,66 @@ from dataclasses import dataclass
 @dataclass
 class LocationDetails:
     """Subset of Property data relevant to location."""
-    street_address: str
-    city: str
-    state: str
-    zip_code: int
-    county: str
-    latitude: float | None
-    longitude: float | None
+    street_address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[int] = None
+    county: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 @dataclass
 class FeatureDetails:
     """Property features, such as number of beds/baths."""
-    property_type: str
-    bedrooms: int
-    bathrooms: float
-    sqft: int
-    lot_size: int
+    property_type: Optional[str] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[float] = None
+    sqft: Optional[int] = None
+    lot_size: Optional[int] = None
 
 
 @dataclass
 class AttributeDetails:
     """Property facts not included in features, such as year built."""
-    year_built: int
-    assessor_ID: int
-    legal_description: str
-    owner_occupied: bool
+    year_built: Optional[int] = None
+    assessor_ID: Optional[int] = None
+    legal_description: Optional[str] = None
+    owner_occupied: Optional[bool] = None
 
 
 @dataclass
 class ValueDetails:
     """Values pertaining to expected revenue and costs."""
-    value_est: int
-    property_tax: float
-    mean_rent_est: int
-    median_rent_est: int
-    min_rent: int
-    max_rent: int
-    mortgage_est: float
-    insurance_est: float
-    monthly_tax_est: float
-    capex_est: float
-    mgmt_est: float
-    sum_est_costs: float
+    value_est: Optional[int] = None
+    property_tax: Optional[float] = None
+    mean_rent_est: Optional[int] = None
+    median_rent_est: Optional[int] = None
+    min_rent: Optional[int] = None
+    max_rent: Optional[int] = None
+    mortgage_est: Optional[float] = None
+    insurance_est: Optional[float] = None
+    monthly_tax_est: Optional[float] = None
+    capex_est: Optional[float] = None
+    mgmt_est: Optional[float] = None
+    sum_est_costs: Optional[float] = None
 
 
 @dataclass    
 class Metadata:
-    filename: str
-    rentometer_url: str | None
-    rentcast_url: str | None
+    filename: Optional[str] = None
+    rentometer_url: Optional[str] = None
+    rentcast_url: Optional[str] = None
 
 
 @dataclass
 class Property:
     """Domain model containing subsets of property data."""
-    location: LocationDetails
-    features: FeatureDetails
-    attributes: AttributeDetails
-    values: ValueDetails
-    metadata: Metadata
+    location: Optional[LocationDetails] = field(default_factory=LocationDetails)
+    features: Optional[FeatureDetails] = field(default_factory=FeatureDetails)
+    attributes: Optional[AttributeDetails] = field(default_factory=AttributeDetails)
+    values: Optional[ValueDetails] = field(default_factory=ValueDetails)
+    metadata: Optional[Metadata] = field(default_factory=Metadata)
     
 
 # NOTE: this needs to be recreated at the API client manager level, currently does not exist in tests.py
