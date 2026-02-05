@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, fields
-from typing import Optional, List
+from typing import Optional, List, TypeVar
 from abc import ABC
+from pandas import DataFrame
 
 
 class PropertyData(ABC):
@@ -10,6 +11,26 @@ class PropertyData(ABC):
     
     def is_complete(self) -> bool:
         return len(self.missing_fields()) == 0
+    
+    # TODO: cols_to_fields that takes a DF and defines relevant fields appropriately, checking subfields where needed (as in, for Property)
+    def convert_cols_to_fields(self: "property_data_type", df: DataFrame) -> "property_data_type":
+        # TODO: this will work for all PropertyData EXCEPT Property, which has PropertyData for fields, which won't match columns
+        # for property specifically, go one layer deeper (fields(self) returns a tuple so work with that)
+        for fld in fields(self):
+            if fld.name in df.columns:
+                # TODO: this grabs the first, but what I really want is to populate a LIST of Property objects, not Property objs themselves!
+                new_value = df[fld.name].iloc[0]
+                print(new_value)
+                current_value = getattr(self, fld.name)
+                print(f"Current Value for {fld.name}: {current_value}")
+                if current_value is not None and current_value != new_value:
+                    print(f"Warning: {self.__class__.__name__}.{fld.name}: '{current_value}' vs '{new_value}' - keeping first")
+                elif current_value is None:
+                    setattr(self, fld.name, new_value)
+                    print(f"Should be successfully set! It's now {getattr(self, fld.name)}")
+        return self
+
+property_data_type = TypeVar("property_data_type", bound=PropertyData)
 
 @dataclass
 class LocationDetails(PropertyData):

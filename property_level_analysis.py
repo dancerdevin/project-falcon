@@ -160,6 +160,7 @@ def add_rent_to_parsed_rentcast_data(rentcast_data, rentometer_data):
     subset_rent_data["address"] = subset_rent_data["address"].astype(str)
     
     # Debug: check for matching addresses
+    # TODO: normalize addresses during data intake?
     rentcast_addresses = set(rentcast_data["address"].unique())
     rentometer_addresses = set(subset_rent_data["address"].unique())
     print(f"Rentcast addresses: {rentcast_addresses}")

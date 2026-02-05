@@ -1,4 +1,4 @@
-from property_schema import Property
+from property_schema import Property, LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, Metadata
 from typing import Protocol
 from property_data_intake import rentcast_api, rentometer_api
 from property_level_analysis import parse_rentcast_data, add_rent_to_parsed_rentcast_data, add_costs_to_parsed_rentcast_data, build_attributes, build_features, build_location, build_metadata, build_values
@@ -37,19 +37,27 @@ class CompletePropertyProvider:
     df = add_rent_to_parsed_rentcast_data(rentcast_df, rentometer_df)
     df = add_costs_to_parsed_rentcast_data(df)
     # NOTE: currently copied from property_level_analysis.build_properties()
-    prop_list = []
+    # prop_list = []
 
-    for row in df.itertuples(index=False):
-        location_details = build_location(row)
-        feature_details = build_features(row)
-        attribute_details = build_attributes(row)
-        value_details = build_values(row)
-        metadata = build_metadata(row)
-        prop_list.append(Property(location_details, feature_details, attribute_details, value_details, metadata))
+    # for row in df.itertuples(index=False):
+    #     location_details = build_location(row)
+    #     feature_details = build_features(row)
+    #     attribute_details = build_attributes(row)
+    #     value_details = build_values(row)
+    #     metadata = build_metadata(row)
+    #     prop_list.append(Property(location_details, feature_details, attribute_details, value_details, metadata))
 
-    print(f"Prop_list: {prop_list}")
+    # print(f"Prop_list: {prop_list}")
 
-    prop = prop_list[0]
+    # prop = prop_list[0]
+    # NOTE: testing PropertyData method that currently only works on the subsidiary dataclasses
+    location_details = LocationDetails().convert_cols_to_fields(df)
+    feature_details = FeatureDetails().convert_cols_to_fields(df)
+    attribute_details = AttributeDetails().convert_cols_to_fields(df)
+    value_details = ValueDetails().convert_cols_to_fields(df)
+    metadata = Metadata().convert_cols_to_fields(df)
+    print(f"Location details as example: {location_details}")
+    prop = Property(location_details, feature_details, attribute_details, value_details, metadata)
     if not prop.is_complete():
       raise Exception("Error: Property obj is not complete at the end of CompletePropertyProvider assembly.")
     return prop
@@ -58,16 +66,16 @@ class RentcastPropertyProvider:
   # This follows the PropertyProvider Protocol and def request() outputs a partial property object. Put in CompletePropertyProvider
   # TODO: CURRENTLY RETURNS DF, NOT PARTIAL PROPERTY. So first, do work needed with DF for a given API call, add to Property, and AT THE END, analysis.
   def request(self, location) -> Property:
-    # TODO: Consider how to use rentcast api here and how to replace build_properties() functionality with new partial objects
+    # TODO: check IF the information is available saved, and if not call the API for real, instead of calling the function but actually intake "from_json_dump"
     df_from_json = rentcast_api(location, output="from_json_dump")
     # New functionality to build a partial property from Rentcast data specifically
+    # NOTE: OK, so I'm matching column names with dataclass field names, right? add this functionality to property_schema and then give DF to Property?
     rentcast_subset_df = parse_rentcast_data(df_from_json)
     return rentcast_subset_df
 
 class RentometerPropertyProvider:
   # TODO: CURRENTLY RETURNS DF, NOT PARTIAL PROPERTY. 
   def request(self, location) -> Property:
-    # TODO: Consider how to use rentcast api here and how to replace build_properties() functionality with new partial objects
     df_from_json = rentometer_api(location, output="from_json_dump")
     # New functionality to build a partial property from Rentometer data specifically
     return df_from_json
