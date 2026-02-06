@@ -36,28 +36,8 @@ class CompletePropertyProvider:
     rentometer_df = rentometer_provider.request(location)
     df = add_rent_to_parsed_rentcast_data(rentcast_df, rentometer_df)
     df = add_costs_to_parsed_rentcast_data(df)
-    # NOTE: currently copied from property_level_analysis.build_properties()
-    # prop_list = []
-
-    # for row in df.itertuples(index=False):
-    #     location_details = build_location(row)
-    #     feature_details = build_features(row)
-    #     attribute_details = build_attributes(row)
-    #     value_details = build_values(row)
-    #     metadata = build_metadata(row)
-    #     prop_list.append(Property(location_details, feature_details, attribute_details, value_details, metadata))
-
-    # print(f"Prop_list: {prop_list}")
-
-    # prop = prop_list[0]
-    # NOTE: testing PropertyData method that currently only works on the subsidiary dataclasses
-    # location_details = LocationDetails().convert_cols_to_fields(df)
-    # feature_details = FeatureDetails().convert_cols_to_fields(df)
-    # attribute_details = AttributeDetails().convert_cols_to_fields(df)
-    # value_details = ValueDetails().convert_cols_to_fields(df)
-    # metadata = Metadata().convert_cols_to_fields(df)
-    # print(f"Location details as example: {location_details}")
-    # prop = Property(location_details, feature_details, attribute_details, value_details, metadata)
+    print(df.columns)
+    # TODO: centralize data processing: do analysis, rename columns, whatever
     prop = Property().convert_cols_to_fields(df)
     if not prop.is_complete():
       raise Exception("Error: Property obj is not complete at the end of CompletePropertyProvider assembly.")
