@@ -51,13 +51,14 @@ class CompletePropertyProvider:
 
     # prop = prop_list[0]
     # NOTE: testing PropertyData method that currently only works on the subsidiary dataclasses
-    location_details = LocationDetails().convert_cols_to_fields(df)
-    feature_details = FeatureDetails().convert_cols_to_fields(df)
-    attribute_details = AttributeDetails().convert_cols_to_fields(df)
-    value_details = ValueDetails().convert_cols_to_fields(df)
-    metadata = Metadata().convert_cols_to_fields(df)
-    print(f"Location details as example: {location_details}")
-    prop = Property(location_details, feature_details, attribute_details, value_details, metadata)
+    # location_details = LocationDetails().convert_cols_to_fields(df)
+    # feature_details = FeatureDetails().convert_cols_to_fields(df)
+    # attribute_details = AttributeDetails().convert_cols_to_fields(df)
+    # value_details = ValueDetails().convert_cols_to_fields(df)
+    # metadata = Metadata().convert_cols_to_fields(df)
+    # print(f"Location details as example: {location_details}")
+    # prop = Property(location_details, feature_details, attribute_details, value_details, metadata)
+    prop = Property().convert_cols_to_fields(df)
     if not prop.is_complete():
       raise Exception("Error: Property obj is not complete at the end of CompletePropertyProvider assembly.")
     return prop

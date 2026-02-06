@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, fields
-from typing import Optional, List, TypeVar
+from typing import Optional, List, TypeVar, get_origin, get_args
 from abc import ABC
 from pandas import DataFrame
 
@@ -7,7 +7,17 @@ from pandas import DataFrame
 class PropertyData(ABC):
     """Methods shared by Property objects and their component classes, e.g., LocationDetails. Currently, data validation."""
     def missing_fields(self) -> List[str]:
-        return [field.name for field in fields(self) if getattr(self, field.name) is None]
+        missing_fields = [field.name for field in fields(self) if getattr(self, field.name) is None]
+        # print(f"initial missing_fields: {missing_fields}")
+        # If self is Property, check missing_fields in contained dataclasses too.
+        if isinstance(self, Property):
+            for field in fields(self):
+                field_value = getattr(self, field.name)
+                missing_subfields = field_value.missing_fields()
+                # print(f"missing subfields for {field.name}: {missing_subfields}")
+                missing_fields += missing_subfields
+        print(f"final missing_fields: {missing_fields}")
+        return missing_fields
     
     def is_complete(self) -> bool:
         return len(self.missing_fields()) == 0
@@ -17,7 +27,29 @@ class PropertyData(ABC):
         # TODO: this will work for all PropertyData EXCEPT Property, which has PropertyData for fields, which won't match columns
         # for property specifically, go one layer deeper (fields(self) returns a tuple so work with that)
         for fld in fields(self):
-            if fld.name in df.columns:
+            field_type = fld.type
+
+            # If called on Property, must recurse to match dataclass fields with columns. First, unwrap Optional types.
+            if get_origin(field_type) is not None: # Then it is a "generic" type, like Optional
+                # print("generic type detected")
+                args = get_args(field_type)
+                if args:
+                    field_type = args[0] # Optional[T] is Union[T, None], so index 0 is actual type
+                    # print(f"field_type is {field_type}")
+
+            # Now check if that actual type inherits from PropertyData and, if so, recurse
+            if isinstance(field_type, type) and issubclass(field_type, PropertyData): 
+                # print(f"beginning recursion on {fld.name}")
+                current_nested = getattr(self, fld.name)
+                # print(f"current_nested is {current_nested}")
+                if current_nested is None:
+                    current_nested = fld.type() # Instantiate, e.g., LocationDetails() if not yet instantiated
+                    # print(f"instantiating {current_nested}")
+                new_nested = current_nested.convert_cols_to_fields(df)
+                setattr(self, fld.name, new_nested)
+                # print(f"called setattr. new_nested is now {new_nested}")
+
+            elif fld.name in df.columns:
                 # TODO: this grabs the first, but what I really want is to populate a LIST of Property objects, not Property objs themselves!
                 new_value = df[fld.name].iloc[0]
                 print(new_value)
@@ -28,6 +60,7 @@ class PropertyData(ABC):
                 elif current_value is None:
                     setattr(self, fld.name, new_value)
                     print(f"Should be successfully set! It's now {getattr(self, fld.name)}")
+
         return self
 
 property_data_type = TypeVar("property_data_type", bound=PropertyData)
