@@ -48,10 +48,10 @@ class CompletePropertyProvider:
     print(rentcast_prop)
     print(rentometer_prop)
     all_prop_data = [rentcast_prop, rentometer_prop]
-    # TODO: combine_property_data @staticmethod
     combined_prop = PropertyData.combine_prop_data(all_prop_data)
-    return combined_prop
-    # TODO: pass combined data into CompletePropertyAnalyzer
+    combined_prop_analyzer = CompletePropertyAnalyzer()
+    analyzed_prop = combined_prop_analyzer.analyze(combined_prop)
+    return analyzed_prop
 
 
 class RentcastPropertyProvider:
@@ -97,7 +97,8 @@ class CompletePropertyAnalyzer:
       raise Exception("Error: CompletePropertyAnalyzer expects both Rentcast and Rentometer data, but at least one URL is None.")
     # NOTE: check for Rentcast/Rentometer columns and then turn the hybrid analysis function
     # TODO: as_dataframe() @property to pass Property object into add_costs_to_parsed_rentcast_data()
-    analyzed_df = add_costs_to_parsed_rentcast_data(Property.as_dataframe)
+    property_as_dataframe = prop.as_dataframe
+    analyzed_df = add_costs_to_parsed_rentcast_data(property_as_dataframe)
     analyzed_prop = Property().convert_cols_to_fields(analyzed_df)
     return analyzed_prop
 

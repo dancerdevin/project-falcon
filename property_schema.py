@@ -63,21 +63,31 @@ class PropertyData(ABC):
 
         return self
     
-    # TODO: static method to take a list of Properties and do this to each one, concatenating a big DataFrame?
     @property
     def as_dataframe(self: "property_data_type") -> DataFrame:
         # TODO: find every non-dataclass field (e.g., the fields nested within PropertyData) and render as column name
         # for every instance of Property, add as row to DataFrame, then return
         df = DataFrame()
         for field in fields(self):
+            # TODO: repeating this "unpack Optional typing" code so make a helper function to do that shit
             field_type = field.type
+            field_value = getattr(self, field.name)
+
+            # If called on Property, must recurse to match dataclass fields with columns. First, unwrap Optional types.
+            if get_origin(field_type) is not None: # Then it is a "generic" type, like Optional
+                # print("generic type detected")
+                args = get_args(field_type)
+                if args:
+                    field_type = args[0] # Optional[T] is Union[T, None], so index 0 is actual type
+
             # If this PropertyData is a Property and contains PropertyData, find the fields of the nested PropertyData instead
-            if issubclass(field_type, PropertyData):
+            if isinstance(field_type, type) and issubclass(field_type, PropertyData): 
                 # Recurse and add more columns
-                field_value = getattr(self, field.name)
-                df = concat(field_value.as_dataframe, axis=1)
-            # Assign field name as column with 
-            df[field.name] = field_value
+                nested_df = field_value.as_dataframe
+                df = concat([df, nested_df], axis=1)
+            else:
+                # Add non-dataclass field as a column
+                df[field.name] = [field_value] # wrap in list for single row DataFrame
         return df
     
     # TODO: this will probably end up being a list of lists of Property, or list of tuples of Property, or... many Properties at once, basically!

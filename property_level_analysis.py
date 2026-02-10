@@ -172,17 +172,20 @@ def add_rent_to_parsed_rentcast_data(rentcast_data, rentometer_data):
 
 
 def add_costs_to_parsed_rentcast_data(df):
-    df["mortgage_est"] = df["value"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
+    # df["mortgage_est"] = df["value"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
+    df["mortgage_est"] = df["value_est"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
     
     df["insurance_est"] = pd.Series(EST_YEARLY_INSURANCE / 12, index=df.index)
 
     df["monthly_tax_est"] = df["property_tax"] / 12 # Rentcast data is by year
 
     # Estimated maintenance/capex: 1% of house value per year, divided by 12 for monthly
-    df["capex_est"] = df["value"].apply(lambda x: (x * 0.01) / 12)
+    # df["capex_est"] = df["value"].apply(lambda x: (x * 0.01) / 12)
+    df["capex_est"] = df["value_est"].apply(lambda x: (x * 0.01) / 12)
 
     # Estimated management costs: 10% of monthly rent (using median as more robust indicator)
-    df["mgmt_est"] = df["median"] * .1
+    # df["mgmt_est"] = df["median"] * .1
+    df["mgmt_est"] = df["median_rent_est"] * .1
 
     # Estimated monthly costs, summed
     df["sum_est_costs"] = df[["mortgage_est", "insurance_est", "capex_est", "mgmt_est"]].sum(axis=1)
