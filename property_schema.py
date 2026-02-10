@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field, fields
 from typing import Optional, List, TypeVar, get_origin, get_args
 from abc import ABC
-from pandas import DataFrame
+from pandas import DataFrame, concat
 
 
 class PropertyData(ABC):
@@ -62,6 +62,64 @@ class PropertyData(ABC):
                     print(f"Should be successfully set! It's now {getattr(self, fld.name)}")
 
         return self
+    
+    # TODO: static method to take a list of Properties and do this to each one, concatenating a big DataFrame?
+    @property
+    def as_dataframe(self: "property_data_type") -> DataFrame:
+        # TODO: find every non-dataclass field (e.g., the fields nested within PropertyData) and render as column name
+        # for every instance of Property, add as row to DataFrame, then return
+        df = DataFrame()
+        for field in fields(self):
+            field_type = field.type
+            # If this PropertyData is a Property and contains PropertyData, find the fields of the nested PropertyData instead
+            if issubclass(field_type, PropertyData):
+                # Recurse and add more columns
+                field_value = getattr(self, field.name)
+                df = concat(field_value.as_dataframe, axis=1)
+            # Assign field name as column with 
+            df[field.name] = field_value
+        return df
+    
+    # TODO: this will probably end up being a list of lists of Property, or list of tuples of Property, or... many Properties at once, basically!
+    @staticmethod
+    def combine_prop_data(prop_list: List["Property"]) -> "Property":
+        if not isinstance(prop_list, List):
+            raise TypeError("combine_prop_data expects a list of Properties.")
+        combined_prop = Property()
+        # Initialize sub-dataclasses
+        for field in fields(combined_prop):
+            args = get_args(field.type)
+            field_type = args[0] # Actual type it is supposed to be, nested within Optional typing note
+            # Generate a new object of that actual type and assign it to the field in question
+            setattr(combined_prop, field.name, field_type())
+        for prop in prop_list:
+            # E.g., property representing Rentometer data, or representing Rentcast data
+            for field in fields(prop):
+                print(f"checking {field.name}")
+                # LocationDetails, etc.
+                prop_field_value = getattr(prop, field.name)
+                print(f"value is {prop_field_value}")
+                # setattr cannot refer to a nested field, so 1) create temp obj and 2) only setattr not None fields to not overwrite content
+                # Compare every field in prop_field_value and combined_prop_field_value and replace if latter is None
+                combined_prop_field_value = getattr(combined_prop, field.name)
+                print(f"existing value on combined_prop obj is {combined_prop_field_value}")                    
+                for fld in fields(prop_field_value):
+                    print(f"checking subfield {fld.name}")
+                    nested_prop_fld_value = getattr(prop_field_value, fld.name)
+                    # if nested_cmbd_prop_fld_value is not None:
+                    #     print(f"value is {nested_cmbd_prop_fld_value}")
+                    # else:
+                    #     print("value is none")
+                    nested_cmbd_prop_fld_value = getattr(combined_prop_field_value, fld.name)
+                    print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
+                    if nested_cmbd_prop_fld_value is None:
+                        # Populate the still-None subfields within a given field
+                        setattr(combined_prop_field_value, fld.name, nested_prop_fld_value)
+                    # print(f"Found in {prop}: {fld.name} is {nested_fld_value}")
+                # Now update this specific field on the big combined_prop object, without overwriting any not-None subfield values already on it
+                setattr(combined_prop, field.name, combined_prop_field_value)
+                print(f"combined_prop is now {combined_prop}")
+        return combined_prop
 
 property_data_type = TypeVar("property_data_type", bound=PropertyData)
 

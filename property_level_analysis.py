@@ -86,7 +86,7 @@ def build_attributes(row) -> AttributeDetails:
 
 def build_values(row) -> ValueDetails:
     return ValueDetails(
-        value_est = row.value,
+        value_est = row.value_est, # Note that this used to be "value," if that raises any unexpected errors
         property_tax = row.property_tax,
         mean_rent_est = row.mean,
         median_rent_est = row.median,
