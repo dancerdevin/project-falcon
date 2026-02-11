@@ -10,7 +10,7 @@ class PropertyStore:
   def __init__(self):
     self.cached_property = None
 
-  def get(self, location) -> Property:
+  def get(self, location) -> List[Property]:
     # NOTE: This can initially fail by default, then, e.g., scan all JSON dumps saved in the root directory, then get more refined.
     # When it fails, instantiate CompletePropertyProvider and get the Property to return that way
     # TODO: simple initial circuit: on init no "stored_property", load JSON files on disk, provide Property, store Property for 2nd call?
@@ -18,8 +18,8 @@ class PropertyStore:
     if self.cached_property:
       pass # ... check if it's the location we're looking for etc then return
     property_provider = CompletePropertyProvider()
-    prop = property_provider.request(location)
-    return prop
+    prop_list = property_provider.request(location)
+    return prop_list
 
 """Interface for intake that sets expectations for all data providers, e.g., RentcastPropertyProvider."""
 class PropertyProvider(Protocol):
@@ -31,9 +31,8 @@ class PropertyAnalyzer(Protocol):
 
 class CompletePropertyProvider:
   # List distinct PropertyProviders and go through them as needed. This will return a completely initialized Property object.
-  def request(self, location) -> Property:
+  def request(self, location) -> List[Property]:
     rentcast_provider = RentcastPropertyProvider()
-
     rentcast_prop_list = rentcast_provider.request(location)
     rentometer_provider = RentometerPropertyProvider()
     rentometer_prop_list = rentometer_provider.request(location)
@@ -48,7 +47,7 @@ class CompletePropertyProvider:
 class RentcastPropertyProvider:
   # This follows the PropertyProvider Protocol and def request() outputs a partial property object. Put in CompletePropertyProvider
   # TODO: CURRENTLY RETURNS DF, NOT PARTIAL PROPERTY. So first, do work needed with DF for a given API call, add to Property, and AT THE END, analysis.
-  def request(self, location) -> Property:
+  def request(self, location) -> List[Property]:
     # TODO: check IF the information is available saved, and if not call the API for real, instead of calling the function but actually intake "from_json_dump"
     rentcast_df = rentcast_api(location, output="from_json_dump")
     # New functionality to build a partial property from Rentcast data specifically
@@ -67,7 +66,7 @@ class RentcastPropertyProvider:
 
 class RentometerPropertyProvider:
   # TODO: CURRENTLY RETURNS DF, NOT PARTIAL PROPERTY. 
-  def request(self, location) -> Property:
+  def request(self, location) -> List[Property]:
     rentometer_df = rentometer_api(location, output="from_json_dump")
     # New functionality to build a partial property from Rentometer data specifically
     rentometer_df = rentometer_df[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
@@ -102,6 +101,6 @@ class CompletePropertyAnalyzer:
 if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'
   prop_store = PropertyStore()
-  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408")
+  prop_list = prop_store.get(98408)
   print(prop_list[0])
   # print(prop_list[1])

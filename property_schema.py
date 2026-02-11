@@ -105,15 +105,22 @@ class PropertyData(ABC):
                 prop_dict_list.append(prop_dict)
             else:
                 # Try to find an address match. If the address isn't already in prop_dict_list, append new prop_dict. If it is, add entry to dict.
+                match_found = False
                 for stored_dict in prop_dict_list:
                     if stored_dict["address"] == prop_dict["address"]:
                         # Match found. Replace missing data.
+                        match_found = True
                         if "rentcast_data" not in stored_dict and "rentcast_data" in prop_dict:
                             stored_dict["rentcast_data"] = prop_dict["rentcast_data"]
-                        elif "rentometer_data" not in stored_dict and "rentometer_data" in prop_dict:
+                        if "rentometer_data" not in stored_dict and "rentometer_data" in prop_dict:
                             stored_dict["rentometer_data"] = prop_dict["rentometer_data"]
-                        else:
+                        if not ("rentcast_data" in prop_dict or "rentometer_data" in prop_dict):
                             print(f"Warning: match found on {stored_dict["address"]} but no missing data could be replaced.")
+                        break  # Exit the loop once match is found
+                
+                # If no match was found, append this as a new dict
+                if not match_found:
+                    prop_dict_list.append(prop_dict)
 
         # Check for data completion before returning prop_dict_list.
         for prop_dict in prop_dict_list:
@@ -148,7 +155,14 @@ class PropertyData(ABC):
                 # Generate a new object of that actual type and assign it to the field in question
                 setattr(combined_prop, field.name, field_type())
 
-            for value in list(prop_dict.values()):
+            # Define merge priority: rentcast first, then rentometer
+            merge_order = ["rentcast_data", "rentometer_data"]
+            
+            for source_key in merge_order:
+                if source_key not in prop_dict:
+                    continue
+                    
+                value = prop_dict[source_key]
                 for field in fields(value):
                     print(f"checking {field.name}")
                     # LocationDetails, etc.
@@ -162,8 +176,8 @@ class PropertyData(ABC):
                         nested_prop_fld_value = getattr(prop_field_value, fld.name)
                         nested_cmbd_prop_fld_value = getattr(combined_prop_field_value, fld.name)
                         print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
-                        if nested_cmbd_prop_fld_value is None:
-                            # Populate the still-None subfields within a given field
+                        if nested_cmbd_prop_fld_value is None and nested_prop_fld_value is not None:
+                            # Populate the still-None subfields within a given field, but only if the source has actual data
                             setattr(combined_prop_field_value, fld.name, nested_prop_fld_value)
                     # Now update this specific field on the big combined_prop object, without overwriting any not-None subfield values already on it
                     setattr(combined_prop, field.name, combined_prop_field_value)
