@@ -1,20 +1,19 @@
 from dataclasses import dataclass, field, fields
-from typing import Optional, List, TypeVar, get_origin, get_args, Any
+from typing import Optional, List, TypeVar, get_origin, get_args, Any, Dict
 from abc import ABC
 from pandas import DataFrame, concat
+from collections import namedtuple
 
 
 class PropertyData(ABC):
     """Methods shared by Property objects and their component classes, e.g., LocationDetails. Currently, data validation."""
     def missing_fields(self) -> List[str]:
         missing_fields = [field.name for field in fields(self) if getattr(self, field.name) is None]
-        # print(f"initial missing_fields: {missing_fields}")
         # If self is Property, check missing_fields in contained dataclasses too.
         if isinstance(self, Property):
             for field in fields(self):
                 field_value = getattr(self, field.name)
                 missing_subfields = field_value.missing_fields()
-                # print(f"missing subfields for {field.name}: {missing_subfields}")
                 missing_fields += missing_subfields
         print(f"final missing_fields: {missing_fields}")
         return missing_fields
@@ -22,43 +21,44 @@ class PropertyData(ABC):
     def is_complete(self) -> bool:
         return len(self.missing_fields()) == 0
     
-    def convert_cols_to_fields(self: "property_data_type", df: DataFrame) -> "property_data_type":
-        for fld in fields(self):
+    @staticmethod
+    def build_properties_from_dataframe(df: DataFrame) -> List["Property"]:
+        """Generate list of Properties, each one corresponding to a row in a DataFrame."""
+        return [PropertyData._build_property_from_row(row) for row in df.itertuples(index=False)]
+    
+    @staticmethod
+    def _build_property_from_row(row, prop=None) -> "Property":
+        if prop is None:
+            prop = Property() # prop parameter allows for recursion in finding fields to match column names
+
+        for fld in fields(prop):
             field_type = PropertyData._check_optional_typing(fld)
 
             # Now check if that actual type inherits from PropertyData and, if so, recurse
             if isinstance(field_type, type) and issubclass(field_type, PropertyData): 
-                # print(f"beginning recursion on {fld.name}")
-                current_nested = getattr(self, fld.name)
-                # print(f"current_nested is {current_nested}")
-                if current_nested is None:
-                    current_nested = fld.type() # Instantiate, e.g., LocationDetails() if not yet instantiated
-                    # print(f"instantiating {current_nested}")
-                new_nested = current_nested.convert_cols_to_fields(df)
-                setattr(self, fld.name, new_nested)
-                # print(f"called setattr. new_nested is now {new_nested}")
+                nested_instance = getattr(prop, fld.name)
+                if nested_instance is None:
+                    nested_instance = fld.type() # Instantiate, e.g., LocationDetails() if not yet instantiated
+                updated_nested = PropertyData._build_property_from_row(row, nested_instance)
+                setattr(prop, fld.name, updated_nested)
 
-            elif fld.name in df.columns:
-                # TODO: this grabs the first, but what I really want is to populate a LIST of Property objects, not Property objs themselves!
-                new_value = df[fld.name].iloc[0]
-                print(new_value)
-                current_value = getattr(self, fld.name)
-                print(f"Current Value for {fld.name}: {current_value}")
-                if current_value is not None and current_value != new_value:
-                    print(f"Warning: {self.__class__.__name__}.{fld.name}: '{current_value}' vs '{new_value}' - keeping first")
-                elif current_value is None:
-                    setattr(self, fld.name, new_value)
-                    print(f"Should be successfully set! It's now {getattr(self, fld.name)}")
+            elif hasattr(row, fld.name):
+                row_value = getattr(row, fld.name)
+                setattr(prop, fld.name, row_value)
+                # NOTE: the below code should only be necessary when combining properties now but I'll keep it just in case
+                # print(f"Current Value for {fld.name}: {current_value}")
+                # if current_value is not None and current_value != new_value:
+                #     print(f"Warning: {self.__class__.__name__}.{fld.name}: '{current_value}' vs '{new_value}' - keeping first")
+                # elif current_value is None:
+                #     setattr(self, fld.name, new_value)
+                #     print(f"Should be successfully set! It's now {getattr(self, fld.name)}")
 
-        return self
+        return prop
     
     @property
     def as_dataframe(self: "property_data_type") -> DataFrame:
-        # TODO: find every non-dataclass field (e.g., the fields nested within PropertyData) and render as column name
-        # for every instance of Property, add as row to DataFrame, then return
         df = DataFrame()
         for field in fields(self):
-            # TODO: repeating this "unpack Optional typing" code so make a helper function to do that shit
             field_type = PropertyData._check_optional_typing(field)
             field_value = getattr(self, field.name)
 
@@ -72,39 +72,107 @@ class PropertyData(ABC):
                 df[field.name] = [field_value] # wrap in list for single row DataFrame
         return df
     
-    # TODO: this will probably end up being a list of lists of Property, or list of tuples of Property, or... many Properties at once, basically!
     @staticmethod
-    def combine_prop_data(prop_list: List["Property"]) -> "Property":
-        if not isinstance(prop_list, List):
-            raise TypeError("combine_prop_data expects a list of Properties.")
-        combined_prop = Property()
-        # Initialize sub-dataclasses
-        for field in fields(combined_prop):
-            field_type = PropertyData._check_optional_typing(field)
-            # Generate a new object of that actual type and assign it to the field in question
-            setattr(combined_prop, field.name, field_type())
+    def _prop_list_to_prop_dict_list(prop_list: List["Property"]) -> List[Dict[str, "Property"]]:
+        """Takes partial Properties from different data sources, e.g., Rentcast and Rentometer, finds matches by street address,
+        and returns those matches bundled together as dicts to be combined by merge priority into complete Properties in combine_prop_data()."""
+        # TODO: Street address normalization to catch, e.g., variations in spelling between data sources (centralize here? in helper called on intake?)
+
+        # For each Property, generate a dict with key-value pairs for the address (as unique ID) and data sources, distinguishable by Property _url fields.
+        prop_dict_list = []
         for prop in prop_list:
-            # E.g., property representing Rentometer data, or representing Rentcast data
-            for field in fields(prop):
-                print(f"checking {field.name}")
-                # LocationDetails, etc.
-                prop_field_value = getattr(prop, field.name)
-                print(f"value is {prop_field_value}")
-                # Compare every field in prop_field_value and combined_prop_field_value and replace if latter is None
-                combined_prop_field_value = getattr(combined_prop, field.name)
-                print(f"existing value on combined_prop obj is {combined_prop_field_value}")                    
-                for fld in fields(prop_field_value):
-                    print(f"checking subfield {fld.name}")
-                    nested_prop_fld_value = getattr(prop_field_value, fld.name)
-                    nested_cmbd_prop_fld_value = getattr(combined_prop_field_value, fld.name)
-                    print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
-                    if nested_cmbd_prop_fld_value is None:
-                        # Populate the still-None subfields within a given field
-                        setattr(combined_prop_field_value, fld.name, nested_prop_fld_value)
-                # Now update this specific field on the big combined_prop object, without overwriting any not-None subfield values already on it
-                setattr(combined_prop, field.name, combined_prop_field_value)
-                print(f"combined_prop is now {combined_prop}")
-        return combined_prop
+            data_source = None
+
+            if prop.metadata.rentcast_url is not None and prop.metadata.rentometer_url is not None:
+                raise Exception("Error: Property data seems to have more than one source, preventing proper bundling.")
+            elif prop.metadata.rentcast_url is not None:
+                data_source = "rentcast"
+            elif prop.metadata.rentometer_url is not None:
+                data_source = "rentometer"
+            elif data_source is None:
+                raise Exception("Error: Property data does not have recognizable source.")
+            
+            prop_dict = {}
+
+            if data_source == "rentcast":
+                prop_dict = {"address": prop.location.street_address, "rentcast_data": prop}
+            elif data_source == "rentometer":
+                prop_dict = {"address": prop.location.street_address, "rentometer_data": prop}
+            if prop_dict is None:
+                raise Exception("Error: prop_dict was somehow never assigned a data source.")
+            
+            if not prop_dict_list:
+                prop_dict_list.append(prop_dict)
+            else:
+                # Try to find an address match. If the address isn't already in prop_dict_list, append new prop_dict. If it is, add entry to dict.
+                for stored_dict in prop_dict_list:
+                    if stored_dict["address"] == prop_dict["address"]:
+                        # Match found. Replace missing data.
+                        if "rentcast_data" not in stored_dict and "rentcast_data" in prop_dict:
+                            stored_dict["rentcast_data"] = prop_dict["rentcast_data"]
+                        elif "rentometer_data" not in stored_dict and "rentometer_data" in prop_dict:
+                            stored_dict["rentometer_data"] = prop_dict["rentometer_data"]
+                        else:
+                            print(f"Warning: match found on {stored_dict["address"]} but no missing data could be replaced.")
+
+        # Check for data completion before returning prop_dict_list.
+        for prop_dict in prop_dict_list:
+            data_sources = ["rentcast_data", "rentometer_data"]
+            for data_source in data_sources:
+                if data_source not in prop_dict:
+                    print(f"Warning: address {prop_dict["address"]} is still missing {data_source}.")
+            # Drop "address" to make iterating through prop_dict.values() easier: all dict values should be Property objects.
+            del prop_dict["address"]
+
+        return prop_dict_list
+
+    # TODO: call above helper method to turn the list of properties into a list of dicts of properties and THEN combine that into a list of complete properties,
+    # with merge priority made explicit by reference to dict keys
+    @staticmethod
+    def combine_partial_prop_data(prop_list: List["Property"]) -> List["Property"]:
+        """Take a list of partial Properties presumed to be from different data sources and return a list of complete Properties."""
+        if not isinstance(prop_list, List):
+            raise TypeError("combine_partial_prop_data expects a list of Properties.")
+        
+        combined_prop_list = []
+        
+        # First, turn the big list of partial Properties from different data sources into a list of dicts bundling partial Properties on address
+        prop_dict_list = PropertyData._prop_list_to_prop_dict_list(prop_list)
+
+        for prop_dict in prop_dict_list:
+            # Assume at this stage that every prop_dict represents a unique Property.
+            combined_prop = Property()
+            # Initialize sub-dataclasses
+            for field in fields(combined_prop):
+                field_type = PropertyData._check_optional_typing(field)
+                # Generate a new object of that actual type and assign it to the field in question
+                setattr(combined_prop, field.name, field_type())
+
+            for value in list(prop_dict.values()):
+                for field in fields(value):
+                    print(f"checking {field.name}")
+                    # LocationDetails, etc.
+                    prop_field_value = getattr(value, field.name)
+                    print(f"value is {prop_field_value}")
+                    # Compare every field in prop_field_value and combined_prop_field_value and replace if latter is None
+                    combined_prop_field_value = getattr(combined_prop, field.name)
+                    print(f"existing value on combined_prop obj is {combined_prop_field_value}")                    
+                    for fld in fields(prop_field_value):
+                        print(f"checking subfield {fld.name}")
+                        nested_prop_fld_value = getattr(prop_field_value, fld.name)
+                        nested_cmbd_prop_fld_value = getattr(combined_prop_field_value, fld.name)
+                        print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
+                        if nested_cmbd_prop_fld_value is None:
+                            # Populate the still-None subfields within a given field
+                            setattr(combined_prop_field_value, fld.name, nested_prop_fld_value)
+                    # Now update this specific field on the big combined_prop object, without overwriting any not-None subfield values already on it
+                    setattr(combined_prop, field.name, combined_prop_field_value)
+                    print(f"combined_prop is now {combined_prop}")
+
+            # Combined_prop should be finished for this dict, so append to combined_prop_list.
+            combined_prop_list.append(combined_prop)
+
+        return combined_prop_list
     
     @staticmethod
     def _check_optional_typing(fld: field) -> Any:

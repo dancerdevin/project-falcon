@@ -1,5 +1,5 @@
 from property_schema import Property, PropertyData, LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, Metadata
-from typing import Protocol
+from typing import Protocol, List
 from property_data_intake import rentcast_api, rentometer_api
 from property_level_analysis import parse_rentcast_data, add_rent_to_parsed_rentcast_data, add_costs_to_parsed_rentcast_data, build_attributes, build_features, build_location, build_metadata, build_values
 
@@ -23,7 +23,7 @@ class PropertyStore:
 
 """Interface for intake that sets expectations for all data providers, e.g., RentcastPropertyProvider."""
 class PropertyProvider(Protocol):
-  def request(location) -> Property: ...
+  def request(location) -> List[Property]: ...
 
 """Interface for all data processors that, e.g., perform pandas analysis. Turn Property to DataFrame and back again."""
 class PropertyAnalyzer(Protocol):
@@ -33,25 +33,16 @@ class CompletePropertyProvider:
   # List distinct PropertyProviders and go through them as needed. This will return a completely initialized Property object.
   def request(self, location) -> Property:
     rentcast_provider = RentcastPropertyProvider()
-    # TODO: currently a df, not a Property
-    rentcast_prop = rentcast_provider.request(location)
+
+    rentcast_prop_list = rentcast_provider.request(location)
     rentometer_provider = RentometerPropertyProvider()
-    rentometer_prop = rentometer_provider.request(location)
-    # df = add_rent_to_parsed_rentcast_data(rentcast_prop, rentometer_df)
-    # df = add_costs_to_parsed_rentcast_data(df)
-    # print(df.columns)
-    # TODO: centralize data processing: do analysis, rename columns, whatever
-    # prop = Property().convert_cols_to_fields(df)
-    # if not prop.is_complete():
-    #   raise Exception("Error: Property obj is not complete at the end of CompletePropertyProvider assembly.")
-    # return prop
-    print(rentcast_prop)
-    print(rentometer_prop)
-    all_prop_data = [rentcast_prop, rentometer_prop]
-    combined_prop = PropertyData.combine_prop_data(all_prop_data)
-    combined_prop_analyzer = CompletePropertyAnalyzer()
-    analyzed_prop = combined_prop_analyzer.analyze(combined_prop)
-    return analyzed_prop
+    rentometer_prop_list = rentometer_provider.request(location)
+    all_prop_data = rentcast_prop_list + rentometer_prop_list
+    combined_prop_list = PropertyData.combine_partial_prop_data(all_prop_data)
+    # TODO: also update analyzer to handle a list of properties
+    # combined_prop_analyzer = CompletePropertyAnalyzer()
+    # analyzed_prop = combined_prop_analyzer.analyze(combined_prop)
+    return combined_prop_list
 
 
 class RentcastPropertyProvider:
@@ -67,8 +58,12 @@ class RentcastPropertyProvider:
     rentcast_subset_df = rentcast_subset_df.rename(columns={"formattedAddress": "street_address", "value": "value_est"})
     # TODO: actually get this from the Rentcast API finally
     rentcast_subset_df["rentcast_url"] = "placeholder"
-    rentcast_prop = Property().convert_cols_to_fields(rentcast_subset_df)
-    return rentcast_prop
+    # TODO: this is where I should call a static method on a dataframe to return a list of properties and then take the first index and return to maintain pipeline
+    # NOTE: do this for both Rentcast and Rentometer and then create func to take multiple List[Property] and combine into List[Tuple[Property]] (match on address?)
+    # rentcast_prop = Property().convert_cols_to_fields(rentcast_subset_df)
+    prop_list = PropertyData.build_properties_from_dataframe(rentcast_subset_df)
+    # rentcast_prop = prop_list[0]
+    return prop_list
 
 class RentometerPropertyProvider:
   # TODO: CURRENTLY RETURNS DF, NOT PARTIAL PROPERTY. 
@@ -85,8 +80,9 @@ class RentometerPropertyProvider:
       "min": "min_rent",
       "max": "max_rent"})
 
-    rentometer_prop = Property().convert_cols_to_fields(rentometer_df)
-    return rentometer_prop
+    prop_list = PropertyData.build_properties_from_dataframe(rentometer_df)
+    # rentometer_prop = prop_list[0]
+    return prop_list
 
 class CompletePropertyAnalyzer:
   """Include analysis that requires, e.g., data from both Rentcast and Rentometer."""
@@ -99,11 +95,13 @@ class CompletePropertyAnalyzer:
     # TODO: as_dataframe() @property to pass Property object into add_costs_to_parsed_rentcast_data()
     property_as_dataframe = prop.as_dataframe
     analyzed_df = add_costs_to_parsed_rentcast_data(property_as_dataframe)
-    analyzed_prop = Property().convert_cols_to_fields(analyzed_df)
+    analyzed_prop_list = PropertyData.build_properties_from_dataframe(analyzed_df)
+    analyzed_prop = analyzed_prop_list[0]
     return analyzed_prop
 
 if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'
   prop_store = PropertyStore()
-  prop = prop_store.get("6478 S M St, Tacoma, WA 98408")
-  print(prop)
+  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408")
+  print(prop_list[0])
+  # print(prop_list[1])
