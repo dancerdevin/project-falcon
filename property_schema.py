@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, fields
-from typing import Optional, List, TypeVar, get_origin, get_args
+from typing import Optional, List, TypeVar, get_origin, get_args, Any
 from abc import ABC
 from pandas import DataFrame, concat
 
@@ -22,20 +22,9 @@ class PropertyData(ABC):
     def is_complete(self) -> bool:
         return len(self.missing_fields()) == 0
     
-    # TODO: cols_to_fields that takes a DF and defines relevant fields appropriately, checking subfields where needed (as in, for Property)
     def convert_cols_to_fields(self: "property_data_type", df: DataFrame) -> "property_data_type":
-        # TODO: this will work for all PropertyData EXCEPT Property, which has PropertyData for fields, which won't match columns
-        # for property specifically, go one layer deeper (fields(self) returns a tuple so work with that)
         for fld in fields(self):
-            field_type = fld.type
-
-            # If called on Property, must recurse to match dataclass fields with columns. First, unwrap Optional types.
-            if get_origin(field_type) is not None: # Then it is a "generic" type, like Optional
-                # print("generic type detected")
-                args = get_args(field_type)
-                if args:
-                    field_type = args[0] # Optional[T] is Union[T, None], so index 0 is actual type
-                    # print(f"field_type is {field_type}")
+            field_type = PropertyData._check_optional_typing(fld)
 
             # Now check if that actual type inherits from PropertyData and, if so, recurse
             if isinstance(field_type, type) and issubclass(field_type, PropertyData): 
@@ -70,15 +59,8 @@ class PropertyData(ABC):
         df = DataFrame()
         for field in fields(self):
             # TODO: repeating this "unpack Optional typing" code so make a helper function to do that shit
-            field_type = field.type
+            field_type = PropertyData._check_optional_typing(field)
             field_value = getattr(self, field.name)
-
-            # If called on Property, must recurse to match dataclass fields with columns. First, unwrap Optional types.
-            if get_origin(field_type) is not None: # Then it is a "generic" type, like Optional
-                # print("generic type detected")
-                args = get_args(field_type)
-                if args:
-                    field_type = args[0] # Optional[T] is Union[T, None], so index 0 is actual type
 
             # If this PropertyData is a Property and contains PropertyData, find the fields of the nested PropertyData instead
             if isinstance(field_type, type) and issubclass(field_type, PropertyData): 
@@ -98,8 +80,7 @@ class PropertyData(ABC):
         combined_prop = Property()
         # Initialize sub-dataclasses
         for field in fields(combined_prop):
-            args = get_args(field.type)
-            field_type = args[0] # Actual type it is supposed to be, nested within Optional typing note
+            field_type = PropertyData._check_optional_typing(field)
             # Generate a new object of that actual type and assign it to the field in question
             setattr(combined_prop, field.name, field_type())
         for prop in prop_list:
@@ -109,27 +90,35 @@ class PropertyData(ABC):
                 # LocationDetails, etc.
                 prop_field_value = getattr(prop, field.name)
                 print(f"value is {prop_field_value}")
-                # setattr cannot refer to a nested field, so 1) create temp obj and 2) only setattr not None fields to not overwrite content
                 # Compare every field in prop_field_value and combined_prop_field_value and replace if latter is None
                 combined_prop_field_value = getattr(combined_prop, field.name)
                 print(f"existing value on combined_prop obj is {combined_prop_field_value}")                    
                 for fld in fields(prop_field_value):
                     print(f"checking subfield {fld.name}")
                     nested_prop_fld_value = getattr(prop_field_value, fld.name)
-                    # if nested_cmbd_prop_fld_value is not None:
-                    #     print(f"value is {nested_cmbd_prop_fld_value}")
-                    # else:
-                    #     print("value is none")
                     nested_cmbd_prop_fld_value = getattr(combined_prop_field_value, fld.name)
                     print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
                     if nested_cmbd_prop_fld_value is None:
                         # Populate the still-None subfields within a given field
                         setattr(combined_prop_field_value, fld.name, nested_prop_fld_value)
-                    # print(f"Found in {prop}: {fld.name} is {nested_fld_value}")
                 # Now update this specific field on the big combined_prop object, without overwriting any not-None subfield values already on it
                 setattr(combined_prop, field.name, combined_prop_field_value)
                 print(f"combined_prop is now {combined_prop}")
         return combined_prop
+    
+    @staticmethod
+    def _check_optional_typing(fld: field) -> Any:
+        """Checks for Optional typing in partial PropertyData objects and, where needed, finds the actual intended type. Returns field type.
+        This is a staticmethod so that combine_prop_data, which must take arrays of PropertyData, has access to it."""
+        field_type = fld.type
+
+        # If called on Property, must recurse to match dataclass fields with columns. First, unwrap Optional types.
+        if get_origin(field_type) is not None: # Then it is a "generic" type, like Optional
+            args = get_args(field_type)
+            if args:
+                field_type = args[0] # Optional[T] is Union[T, None], so index 0 is actual type
+        
+        return field_type
 
 property_data_type = TypeVar("property_data_type", bound=PropertyData)
 
