@@ -3,6 +3,7 @@ import sys
 from gsheets_client import GoogleSheetsAPIClient, SPREADSHEET_TITLE, SHEET_ONE_TITLE
 from create_gsheet import GoogleSheet
 from update_gsheet import PropertySpreadsheet, PropertyGsheet
+from property_store import PropertyStore
 
 # Locate parent directory to import property data scripts
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -23,7 +24,9 @@ def main():
   # prop_list = build_properties("2025-10-10_12-42-27", "2025-10-22_13-42")
   # prop_obj = prop_list[0]
   # layout = build_layout(prop_obj)
-  # TODO: hook up PropertyStore instead
+  prop_store = PropertyStore()
+  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408")
+  prop_obj = prop_list[0]
 
   client = GoogleSheetsAPIClient()
   gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)

@@ -5,6 +5,7 @@ from property_schema import *
 from gsheets.gsheets_client import GoogleSheetsAPIClient, SPREADSHEET_TITLE, SHEET_ONE_TITLE
 from gsheets.create_gsheet import GoogleSheet
 from gsheets.update_gsheet import PropertySpreadsheet, PropertyGsheet
+from property_store import PropertyStore
 
 
 def zipcode_to_output(location, output):
@@ -23,7 +24,9 @@ def zipcode_to_output(location, output):
         # prop_list = build_properties(rentometer_datetime_string=rentometer_result, rentcast_datetime_string=rentcast_result)
         # prop_list = build_properties(rentometer_data=rentometer_result, rentcast_data=rentcast_result)
         # prop_obj = prop_list[0]
-        # TODO: hook up PropertyStore instead
+        prop_store = PropertyStore()
+        prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408")
+        prop_obj = prop_list[0]
 
         client = GoogleSheetsAPIClient()
         gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)

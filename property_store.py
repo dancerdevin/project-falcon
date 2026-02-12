@@ -2,7 +2,6 @@ from property_schema import Property, PropertyData, LocationDetails, FeatureDeta
 from typing import Protocol, List
 from property_data_intake import rentcast_api, rentometer_api
 from property_level_analysis import parse_rentcast_data, add_rent_to_parsed_rentcast_data, add_costs_to_parsed_rentcast_data # , build_attributes, build_features, build_location, build_metadata, build_values
-import pandas as pd
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
 
