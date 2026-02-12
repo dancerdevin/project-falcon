@@ -59,8 +59,18 @@ class RentcastPropertyProvider:
     rentcast_df = rentcast_api(location, output="from_json_dump")
     # New functionality to build a partial property from Rentcast data specifically
     rentcast_subset_df = parse_rentcast_data(rentcast_df)
-    # TODO: depreciate this part of the second analysis function
-    rentcast_subset_df = rentcast_subset_df.rename(columns={"formattedAddress": "street_address", "value": "value_est"})
+    # TODO: clearly designated where the renaming happens for Providers (_rename()?)
+    rentcast_subset_df = rentcast_subset_df.rename(columns={
+      "formattedAddress": "street_address",
+      "value": "value_est",
+      "zipCode": "zip_code",
+      "squareFootage": "sqft",
+      "propertyType": "property_type",
+      "lotSize": "lot_size",
+      "yearBuilt": "year_built",
+      "assessorID": "assessor_ID",
+      "legalDescription": "legal_description",
+      "ownerOccupied": "owner_occupied"})
     # TODO: actually get this from the Rentcast API finally
     rentcast_subset_df["rentcast_url"] = "placeholder"
     prop_list = PropertyData.build_properties_from_dataframe(rentcast_subset_df)
@@ -82,13 +92,13 @@ class RentometerPropertyProvider:
       "max": "max_rent"})
     
     # Check if the address exists
-    exists = (rentometer_df['street_address'] == '6478 S M St, Tacoma, WA 98408').any()
-    print(f"Address found in rentometer_df: {exists}")
+    # exists = (rentometer_df['street_address'] == '6478 S M St, Tacoma, WA 98408').any()
+    # print(f"Address found in rentometer_df: {exists}")
 
     prop_list = PropertyData.build_properties_from_dataframe(rentometer_df)
-    for prop in prop_list:
-      if prop.location.street_address == '6478 S M St, Tacoma, WA 98408':
-        print("it's also in prop_list!")
+    # for prop in prop_list:
+    #   if prop.location.street_address == '6478 S M St, Tacoma, WA 98408':
+    #     print("it's also in prop_list!")
     return prop_list
 
 class CompletePropertyAnalyzer:
