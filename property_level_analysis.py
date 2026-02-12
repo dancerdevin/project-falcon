@@ -181,7 +181,24 @@ def add_rent_to_parsed_rentcast_data(rentcast_data, rentometer_data):
 
 
 def add_costs_to_parsed_rentcast_data(df):
-    # df["mortgage_est"] = df["value"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
+    # TODO: conform "objects" to standardized datatypes (do it here for now and figure out where to really do it later)
+    # print(df.info(verbose=True))
+
+    data_type_dict = { # Defaulting to floats for now even if ints might suffice for some
+        "mean_rent_est": float64,
+        "median_rent_est": float64,
+        "min_rent": float64,
+        "max_rent": float64,
+        "mortgage_est": float64,
+        "insurance_est": float64,
+        "monthly_tax_est": float64,
+        "capex_est": float64,
+        "mgmt_est": float64,
+        "sum_est_costs": float64
+    }
+
+    df = df.astype(data_type_dict)
+
     df["mortgage_est"] = df["value_est"].apply(lambda x: calculate_amortization_amount((x * LOAN_TO_VALUE), APR, AMORT_MONTHS))
     
     df["insurance_est"] = pd.Series(EST_YEARLY_INSURANCE / 12, index=df.index)
@@ -189,11 +206,9 @@ def add_costs_to_parsed_rentcast_data(df):
     df["monthly_tax_est"] = df["property_tax"] / 12 # Rentcast data is by year
 
     # Estimated maintenance/capex: 1% of house value per year, divided by 12 for monthly
-    # df["capex_est"] = df["value"].apply(lambda x: (x * 0.01) / 12)
     df["capex_est"] = df["value_est"].apply(lambda x: (x * 0.01) / 12)
 
     # Estimated management costs: 10% of monthly rent (using median as more robust indicator)
-    # df["mgmt_est"] = df["median"] * .1
     df["mgmt_est"] = df["median_rent_est"] * .1
 
     # Estimated monthly costs, summed

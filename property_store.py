@@ -27,7 +27,7 @@ class PropertyProvider(Protocol):
 
 """Interface for all data processors that, e.g., perform pandas analysis. Turn Property to DataFrame and back again."""
 class PropertyAnalyzer(Protocol):
-  def analyze(prop: Property) -> Property: ...
+  def analyze(prop_list: List[Property]) -> List[Property]: ...
 
 class CompletePropertyProvider:
   # List distinct PropertyProviders and go through them as needed. This will return a completely initialized Property object.
@@ -40,20 +40,16 @@ class CompletePropertyProvider:
         print(prop)
     rentometer_provider = RentometerPropertyProvider()
     rentometer_prop_list = rentometer_provider.request(location)
-    for prop in rentometer_prop_list:
-      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
-        print("address found from RentometerProvider")
-        print(prop)
     all_prop_data = rentcast_prop_list + rentometer_prop_list
     combined_prop_list = PropertyData.combine_partial_prop_data(all_prop_data)
-    for prop in combined_prop_list:
-      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
-        print("address found in combined_prop_list")
-        print(prop)
     # TODO: also update analyzer to handle a list of properties
-    # combined_prop_analyzer = CompletePropertyAnalyzer()
-    # analyzed_prop = combined_prop_analyzer.analyze(combined_prop)
-    return combined_prop_list
+    combined_prop_analyzer = CompletePropertyAnalyzer()
+    analyzed_prop_list = combined_prop_analyzer.analyze(combined_prop_list)
+    for prop in analyzed_prop_list:
+      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
+        print("address found in analyzed_prop_list")
+        print(prop)
+    return analyzed_prop_list
 
 
 class RentcastPropertyProvider:
@@ -97,18 +93,16 @@ class RentometerPropertyProvider:
 
 class CompletePropertyAnalyzer:
   """Include analysis that requires, e.g., data from both Rentcast and Rentometer."""
-  def analyze(self, prop: Property) -> Property:
-    if not isinstance(prop, Property):
-      raise TypeError("CompletePropertyAnalyzer takes a Property. Please input the result of at least one different PropertyProvider.")
-    if prop.metadata.rentcast_url is None or prop.metadata.rentometer_url is None:
-      raise Exception("Error: CompletePropertyAnalyzer expects both Rentcast and Rentometer data, but at least one URL is None.")
-    # NOTE: check for Rentcast/Rentometer columns and then turn the hybrid analysis function
-    # TODO: as_dataframe() @property to pass Property object into add_costs_to_parsed_rentcast_data()
-    property_as_dataframe = prop.as_dataframe
-    analyzed_df = add_costs_to_parsed_rentcast_data(property_as_dataframe)
+  def analyze(self, prop_list: List[Property]) -> List[Property]:
+    if not isinstance(prop_list, list):
+      raise TypeError("CompletePropertyAnalyzer takes a list of Properties. Please input the result of at least one different PropertyProvider.")
+    # TODO: make it so partial data is just skipped rather than errors out
+    # if prop.metadata.rentcast_url is None or prop.metadata.rentometer_url is None:
+    #   raise Exception("Error: CompletePropertyAnalyzer expects both Rentcast and Rentometer data, but at least one URL is None.")
+    prop_big_df = PropertyData.prop_list_to_dataframe(prop_list)
+    analyzed_df = add_costs_to_parsed_rentcast_data(prop_big_df)
     analyzed_prop_list = PropertyData.build_properties_from_dataframe(analyzed_df)
-    analyzed_prop = analyzed_prop_list[0]
-    return analyzed_prop
+    return analyzed_prop_list
 
 if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'

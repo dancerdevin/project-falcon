@@ -55,8 +55,20 @@ class PropertyData(ABC):
 
         return prop
     
+    @staticmethod
+    def prop_list_to_dataframe(prop_list: List["Property"]) -> DataFrame:
+        """Analyze as-complete-as-possible Property objects by populating a big DataFrame where each Property element becomes a row."""
+        # TODO: Run analysis functions contingent on data sources available, e.g., if no 'rentometer_url', don't try to rely on Rentometer data
+        df = DataFrame()
+        for prop in prop_list:
+            prop_df = prop.as_dataframe
+            df = concat([df, prop_df], axis=1) if df.empty else concat([df, prop_df], axis=0) # Stack horizontally once to get columns, then vertically
+        return df
+    
     @property
     def as_dataframe(self: "property_data_type") -> DataFrame:
+        """Converts a single Property object to a DataFrame."""
+        # TODO: optional parameter to pass in existing DF/columns? would that speed this up?
         df = DataFrame()
         for field in fields(self):
             field_type = PropertyData._check_optional_typing(field)
