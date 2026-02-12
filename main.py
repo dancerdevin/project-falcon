@@ -21,8 +21,9 @@ def zipcode_to_output(location, output):
 
     if output != "dump_to_disk_no_pub":
         # prop_list = build_properties(rentometer_datetime_string=rentometer_result, rentcast_datetime_string=rentcast_result)
-        prop_list = build_properties(rentometer_data=rentometer_result, rentcast_data=rentcast_result)
-        prop_obj = prop_list[0]
+        # prop_list = build_properties(rentometer_data=rentometer_result, rentcast_data=rentcast_result)
+        # prop_obj = prop_list[0]
+        # TODO: hook up PropertyStore instead
 
         client = GoogleSheetsAPIClient()
         gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)

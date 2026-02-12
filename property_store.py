@@ -1,7 +1,8 @@
 from property_schema import Property, PropertyData, LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, Metadata
 from typing import Protocol, List
 from property_data_intake import rentcast_api, rentometer_api
-from property_level_analysis import parse_rentcast_data, add_rent_to_parsed_rentcast_data, add_costs_to_parsed_rentcast_data, build_attributes, build_features, build_location, build_metadata, build_values
+from property_level_analysis import parse_rentcast_data, add_rent_to_parsed_rentcast_data, add_costs_to_parsed_rentcast_data # , build_attributes, build_features, build_location, build_metadata, build_values
+import pandas as pd
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
 
@@ -34,10 +35,22 @@ class CompletePropertyProvider:
   def request(self, location) -> List[Property]:
     rentcast_provider = RentcastPropertyProvider()
     rentcast_prop_list = rentcast_provider.request(location)
+    for prop in rentcast_prop_list:
+      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
+        print("address found from RentcastProvider")
+        print(prop)
     rentometer_provider = RentometerPropertyProvider()
     rentometer_prop_list = rentometer_provider.request(location)
+    for prop in rentometer_prop_list:
+      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
+        print("address found from RentometerProvider")
+        print(prop)
     all_prop_data = rentcast_prop_list + rentometer_prop_list
     combined_prop_list = PropertyData.combine_partial_prop_data(all_prop_data)
+    for prop in combined_prop_list:
+      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
+        print("address found in combined_prop_list")
+        print(prop)
     # TODO: also update analyzer to handle a list of properties
     # combined_prop_analyzer = CompletePropertyAnalyzer()
     # analyzed_prop = combined_prop_analyzer.analyze(combined_prop)
@@ -45,27 +58,20 @@ class CompletePropertyProvider:
 
 
 class RentcastPropertyProvider:
-  # This follows the PropertyProvider Protocol and def request() outputs a partial property object. Put in CompletePropertyProvider
-  # TODO: CURRENTLY RETURNS DF, NOT PARTIAL PROPERTY. So first, do work needed with DF for a given API call, add to Property, and AT THE END, analysis.
+  """This follows the PropertyProvider Protocol and def request() outputs a partial property object."""
   def request(self, location) -> List[Property]:
     # TODO: check IF the information is available saved, and if not call the API for real, instead of calling the function but actually intake "from_json_dump"
     rentcast_df = rentcast_api(location, output="from_json_dump")
     # New functionality to build a partial property from Rentcast data specifically
-    # NOTE: OK, so I'm matching column names with dataclass field names, right? add this functionality to property_schema and then give DF to Property?
     rentcast_subset_df = parse_rentcast_data(rentcast_df)
     # TODO: depreciate this part of the second analysis function
     rentcast_subset_df = rentcast_subset_df.rename(columns={"formattedAddress": "street_address", "value": "value_est"})
     # TODO: actually get this from the Rentcast API finally
     rentcast_subset_df["rentcast_url"] = "placeholder"
-    # TODO: this is where I should call a static method on a dataframe to return a list of properties and then take the first index and return to maintain pipeline
-    # NOTE: do this for both Rentcast and Rentometer and then create func to take multiple List[Property] and combine into List[Tuple[Property]] (match on address?)
-    # rentcast_prop = Property().convert_cols_to_fields(rentcast_subset_df)
     prop_list = PropertyData.build_properties_from_dataframe(rentcast_subset_df)
-    # rentcast_prop = prop_list[0]
     return prop_list
 
 class RentometerPropertyProvider:
-  # TODO: CURRENTLY RETURNS DF, NOT PARTIAL PROPERTY. 
   def request(self, location) -> List[Property]:
     rentometer_df = rentometer_api(location, output="from_json_dump")
     # New functionality to build a partial property from Rentometer data specifically
@@ -74,13 +80,20 @@ class RentometerPropertyProvider:
     rentometer_df = rentometer_df.drop_duplicates()
 
     rentometer_df = rentometer_df.rename(columns={
+      "address": "street_address",
       "mean": "mean_rent_est",
       "median": "median_rent_est",
       "min": "min_rent",
       "max": "max_rent"})
+    
+    # Check if the address exists
+    exists = (rentometer_df['street_address'] == '6478 S M St, Tacoma, WA 98408').any()
+    print(f"Address found in rentometer_df: {exists}")
 
     prop_list = PropertyData.build_properties_from_dataframe(rentometer_df)
-    # rentometer_prop = prop_list[0]
+    for prop in prop_list:
+      if prop.location.street_address == '6478 S M St, Tacoma, WA 98408':
+        print("it's also in prop_list!")
     return prop_list
 
 class CompletePropertyAnalyzer:
@@ -100,7 +113,9 @@ class CompletePropertyAnalyzer:
 
 if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'
+  # another test address: "6478 S M St, Tacoma, WA 98408"
   prop_store = PropertyStore()
-  prop_list = prop_store.get(98408)
-  print(prop_list[0])
-  # print(prop_list[1])
+  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408")
+  for prop in prop_list:
+    if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
+      print(prop)

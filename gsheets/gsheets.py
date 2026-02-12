@@ -20,9 +20,10 @@ DATETIME_STRING = "2025-10-28"
 
 def main():
   # address_dict = address_data_to_gsheet(ADDRESS_STRING, DATETIME_STRING)
-  prop_list = build_properties("2025-10-10_12-42-27", "2025-10-22_13-42")
-  prop_obj = prop_list[0]
+  # prop_list = build_properties("2025-10-10_12-42-27", "2025-10-22_13-42")
+  # prop_obj = prop_list[0]
   # layout = build_layout(prop_obj)
+  # TODO: hook up PropertyStore instead
 
   client = GoogleSheetsAPIClient()
   gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)

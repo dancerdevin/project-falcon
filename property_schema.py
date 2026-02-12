@@ -124,10 +124,10 @@ class PropertyData(ABC):
 
         # Check for data completion before returning prop_dict_list.
         for prop_dict in prop_dict_list:
-            data_sources = ["rentcast_data", "rentometer_data"]
-            for data_source in data_sources:
-                if data_source not in prop_dict:
-                    print(f"Warning: address {prop_dict["address"]} is still missing {data_source}.")
+            # data_sources = ["rentcast_data", "rentometer_data"]
+            # for data_source in data_sources:
+            #     if data_source not in prop_dict:
+            #         print(f"Warning: address {prop_dict["address"]} is still missing {data_source}.")
             # Drop "address" to make iterating through prop_dict.values() easier: all dict values should be Property objects.
             del prop_dict["address"]
 
@@ -164,24 +164,24 @@ class PropertyData(ABC):
                     
                 value = prop_dict[source_key]
                 for field in fields(value):
-                    print(f"checking {field.name}")
+                    # print(f"checking {field.name}")
                     # LocationDetails, etc.
                     prop_field_value = getattr(value, field.name)
-                    print(f"value is {prop_field_value}")
+                    # print(f"value is {prop_field_value}")
                     # Compare every field in prop_field_value and combined_prop_field_value and replace if latter is None
                     combined_prop_field_value = getattr(combined_prop, field.name)
-                    print(f"existing value on combined_prop obj is {combined_prop_field_value}")                    
+                    # print(f"existing value on combined_prop obj is {combined_prop_field_value}")                    
                     for fld in fields(prop_field_value):
-                        print(f"checking subfield {fld.name}")
+                        # print(f"checking subfield {fld.name}")
                         nested_prop_fld_value = getattr(prop_field_value, fld.name)
                         nested_cmbd_prop_fld_value = getattr(combined_prop_field_value, fld.name)
-                        print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
+                        # print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
                         if nested_cmbd_prop_fld_value is None and nested_prop_fld_value is not None:
                             # Populate the still-None subfields within a given field, but only if the source has actual data
                             setattr(combined_prop_field_value, fld.name, nested_prop_fld_value)
                     # Now update this specific field on the big combined_prop object, without overwriting any not-None subfield values already on it
                     setattr(combined_prop, field.name, combined_prop_field_value)
-                    print(f"combined_prop is now {combined_prop}")
+                    # print(f"combined_prop is now {combined_prop}")
 
             # Combined_prop should be finished for this dict, so append to combined_prop_list.
             combined_prop_list.append(combined_prop)

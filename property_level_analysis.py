@@ -21,92 +21,92 @@ class ExpectedColumns(StrEnum):
     PROPERTY_TAX = "property_tax"
 
 
-def build_properties(rentcast_data, rentometer_data) -> list:
-    """Assemble list of Property objects populated by LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, and Metadata objects."""
-    df = parse_rentcast_data(rentcast_data)
-    print(f"Stage 1: {df.head()}")
+# def build_properties(rentcast_data, rentometer_data) -> list:
+#     """Assemble list of Property objects populated by LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, and Metadata objects."""
+#     df = parse_rentcast_data(rentcast_data)
+#     print(f"Stage 1: {df.head()}")
 
-    # Aggregate Rentometer data into Rentcast data.
-    df_with_rent = add_rent_to_parsed_rentcast_data(df, rentometer_data)
-    print(f"Stage 2: {df_with_rent.head()}")
+#     # Aggregate Rentometer data into Rentcast data.
+#     df_with_rent = add_rent_to_parsed_rentcast_data(df, rentometer_data)
+#     print(f"Stage 2: {df_with_rent.head()}")
 
-    # While data remains in Pandas DataFrame/Series form, perform calculations by column.
-    df_with_rent_and_costs = add_costs_to_parsed_rentcast_data(df_with_rent)
-    print(f"Stage 3: {df_with_rent_and_costs.head()}")
+#     # While data remains in Pandas DataFrame/Series form, perform calculations by column.
+#     df_with_rent_and_costs = add_costs_to_parsed_rentcast_data(df_with_rent)
+#     print(f"Stage 3: {df_with_rent_and_costs.head()}")
 
-    # Then, use itertuples() to efficiently treat each row as a property by turning them into NamedTuples.
-    prop_list = []
+#     # Then, use itertuples() to efficiently treat each row as a property by turning them into NamedTuples.
+#     prop_list = []
 
-    for row in df_with_rent_and_costs.itertuples(index=False):
-        location_details = build_location(row)
-        feature_details = build_features(row)
-        attribute_details = build_attributes(row)
-        value_details = build_values(row)
-        metadata = build_metadata(row)
-        prop_list.append(Property(location_details, feature_details, attribute_details, value_details, metadata))
+#     for row in df_with_rent_and_costs.itertuples(index=False):
+#         location_details = build_location(row)
+#         feature_details = build_features(row)
+#         attribute_details = build_attributes(row)
+#         value_details = build_values(row)
+#         metadata = build_metadata(row)
+#         prop_list.append(Property(location_details, feature_details, attribute_details, value_details, metadata))
 
-    print(f"Prop_list: {prop_list}")
+#     print(f"Prop_list: {prop_list}")
 
-    return prop_list
-
-
-def build_location(row) -> LocationDetails:
-    # NOTE: Right now, each of these values is a Pandas Series.
-    # What I should likely do is: build_properties(), build_locations(), etc., and at each stage,
-    # return the data for each given property as a group of LocationDetails containing each Series element by index.
-    return LocationDetails(
-        street_address = row.address,
-        city = row.city,
-        state = row.state,
-        zip_code = row.zipCode,
-        county = row.county,
-        latitude = row.latitude,
-        longitude = row.longitude
-    )
+#     return prop_list
 
 
-def build_features(row) -> FeatureDetails:
-    return FeatureDetails(
-        property_type = row.propertyType,
-        bedrooms = row.bedrooms,
-        bathrooms = row.bathrooms,
-        sqft = row.squareFootage,
-        lot_size = row.lotSize
-    )
+# def build_location(row) -> LocationDetails:
+#     # NOTE: Right now, each of these values is a Pandas Series.
+#     # What I should likely do is: build_properties(), build_locations(), etc., and at each stage,
+#     # return the data for each given property as a group of LocationDetails containing each Series element by index.
+#     return LocationDetails(
+#         street_address = row.address,
+#         city = row.city,
+#         state = row.state,
+#         zip_code = row.zipCode,
+#         county = row.county,
+#         latitude = row.latitude,
+#         longitude = row.longitude
+#     )
 
 
-def build_attributes(row) -> AttributeDetails:
-    return AttributeDetails(
-        year_built = row.yearBuilt,
-        assessor_ID = row.assessorID,
-        legal_description = row.legalDescription,
-        owner_occupied = row.ownerOccupied
-    )
+# def build_features(row) -> FeatureDetails:
+#     return FeatureDetails(
+#         property_type = row.propertyType,
+#         bedrooms = row.bedrooms,
+#         bathrooms = row.bathrooms,
+#         sqft = row.squareFootage,
+#         lot_size = row.lotSize
+#     )
 
 
-def build_values(row) -> ValueDetails:
-    return ValueDetails(
-        value_est = row.value_est, # Note that this used to be "value," if that raises any unexpected errors
-        property_tax = row.property_tax,
-        mean_rent_est = row.mean,
-        median_rent_est = row.median,
-        min_rent = row.min,
-        max_rent = row.max,
-        mortgage_est = row.mortgage_est,
-        insurance_est = row.insurance_est,
-        monthly_tax_est = row.monthly_tax_est,
-        capex_est = row.capex_est,
-        mgmt_est = row.mgmt_est,
-        sum_est_costs = row.sum_est_costs
-    )
+# def build_attributes(row) -> AttributeDetails:
+#     return AttributeDetails(
+#         year_built = row.yearBuilt,
+#         assessor_ID = row.assessorID,
+#         legal_description = row.legalDescription,
+#         owner_occupied = row.ownerOccupied
+#     )
 
 
-def build_metadata(row) -> Metadata:
-    return Metadata(
-        filename = row.filename,
-        rentometer_url = row.rentometer_url,
-        rentcast_url = None # TODO: get from API
-    )
+# def build_values(row) -> ValueDetails:
+#     return ValueDetails(
+#         value_est = row.value_est, # Note that this used to be "value," if that raises any unexpected errors
+#         property_tax = row.property_tax,
+#         mean_rent_est = row.mean,
+#         median_rent_est = row.median,
+#         min_rent = row.min,
+#         max_rent = row.max,
+#         mortgage_est = row.mortgage_est,
+#         insurance_est = row.insurance_est,
+#         monthly_tax_est = row.monthly_tax_est,
+#         capex_est = row.capex_est,
+#         mgmt_est = row.mgmt_est,
+#         sum_est_costs = row.sum_est_costs
+#     )
+
+
+# def build_metadata(row) -> Metadata:
+#     return Metadata(
+#         filename = row.filename,
+#         rentometer_url = row.rentometer_url,
+#         rentcast_url = None # TODO: get from API
+#     )
 
 
 def parse_rentcast_data(df):
@@ -127,6 +127,15 @@ def parse_rentcast_data(df):
     features_df = pd.json_normalize(df["features"])
     df["garage"] = features_df["garage"]
     df["heatingType"] = features_df["heatingType"]
+
+    # Drop now-unpacked columns with dicts to allow for dropping duplicates
+    # NOTE: Currently not storing information on owner, sale history, or HOA. Can change this / refactor Property to contain if needed
+    df = df.drop(["taxAssessments", "propertyTaxes", "features", "owner", "history", "hoa"], axis=1)
+    # TODO: convert other "objects" into Pandas datatypes for ease of analysis? here or at analysis stage?
+
+    # Ignore "filename" as this will be differ on duplicate data taken from different JSON dumps. Just keep first
+    cols_to_check = [col for col in df.columns if col != 'filename']
+    df = df.drop_duplicates(subset=cols_to_check)
 
     # Parse dataframe by specified constants and return.
     subset_df = df[(df["value"] <= max_value) & (df["bedrooms"] >= min_bedrooms) & (df["bathrooms"] >= min_bathrooms) & (df["propertyType"] == property_type)].reset_index(drop=True)
