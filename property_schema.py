@@ -59,15 +59,14 @@ class PropertyData(ABC):
     def prop_list_to_dataframe(prop_list: List["Property"]) -> DataFrame:
         """Analyze as-complete-as-possible Property objects by populating a big DataFrame where each Property element becomes a row."""
         # TODO: Run analysis functions contingent on data sources available, e.g., if no 'rentometer_url', don't try to rely on Rentometer data
-        df = DataFrame()
-        for prop in prop_list:
-            prop_df = prop.as_dataframe
-            df = concat([df, prop_df], axis=1) if df.empty else concat([df, prop_df], axis=0) # Stack horizontally once to get columns, then vertically
+        prop_dict_list = [prop.as_flat_dict for prop in prop_list]
+        # df = concat([df, prop_df], axis=1) if df.empty else concat([df, prop_df], axis=0) # Stack horizontally once to get columns, then vertically
+        df = DataFrame.from_records(prop_dict_list) # Can also just write DataFrame(prop_dict_list) but this makes explicit row-wise concatenation
         return df
     
     @property
     def as_dataframe(self: "property_data_type") -> DataFrame:
-        """Converts a single Property object to a DataFrame."""
+        """Converts a single Property object to a DataFrame. No longer used in prop_list_to_dataframe()."""
         # TODO: optional parameter to pass in existing DF/columns? would that speed this up?
         df = DataFrame()
         for field in fields(self):
@@ -84,6 +83,25 @@ class PropertyData(ABC):
                 df[field.name] = [field_value] # wrap in list for single row DataFrame
         return df
     
+    @property
+    def as_flat_dict(self: "property_data_type") -> Dict:
+        """Converts a single Property object to a flat dict. The built-in asdict() dataclass method would return nested dict."""
+        prop_dict = {}
+        for field in fields(self):
+            field_type = PropertyData._check_optional_typing(field)
+            field_value = getattr(self, field.name)
+
+            # Recurse to nested fields of PropertyData if needed to find non-PropertyData fields
+            if isinstance(field_type, type) and issubclass(field_type, PropertyData):
+                # Recurse and add new key-values pairs
+                nested_dict = field_value.as_flat_dict
+                for nested_key, nested_value in nested_dict.items():
+                    prop_dict[nested_key] = nested_value
+            else:
+                prop_dict[field.name] = field_value
+        
+        return prop_dict
+
     @staticmethod
     def _prop_list_to_prop_dict_list(prop_list: List["Property"]) -> List[Dict[str, "Property"]]:
         """Takes partial Properties from different data sources, e.g., Rentcast and Rentometer, finds matches by street address,
