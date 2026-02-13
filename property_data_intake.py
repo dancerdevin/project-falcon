@@ -1,7 +1,6 @@
 import requests
 import json
 import pgeocode
-import os
 from dotenv import load_dotenv
 from datetime import datetime
 from geopy.geocoders import Nominatim
@@ -14,8 +13,7 @@ from io import StringIO
 load_dotenv() # Load API keys
 geolocator = Nominatim(user_agent="peregrin_app") # Instantiate address-finder
 
-# TODO: Property class with data for property_level_analysis.py (init, str, repr) [now in property_schema.py]
-# TODO: Locale class?
+# TODO: PropertyIntake protocol for RentcastPropertyIntake/RentometerPropertyIntake .get() with overrides
 
 VALID_OUTPUTS = [
     "dump_to_disk_no_pub",      # Call API, save to disk, stop there
@@ -117,70 +115,70 @@ def multiple_rentcast_calls_with_offset(URL, params, headers, results, output):
 
 
 
-def rentometer_api(location, output=""):
-    # Write JSON dump from Rentometer API call.
-    print("Calling rentometer API function for " + str(location))
-    API_KEY = os.getenv("RENTOMETER_API_KEY")
-    URL = "https://www.rentometer.com/api/v1/summary"
-    data = None
+# def rentometer_api(location, output=""):
+#     # Write JSON dump from Rentometer API call.
+#     print("Calling rentometer API function for " + str(location))
+#     API_KEY = os.getenv("RENTOMETER_API_KEY")
+#     URL = "https://www.rentometer.com/api/v1/summary"
+#     data = None
 
-    default_params = {
-        "api_key": API_KEY,
-        "bedrooms": "3",
-        "baths": "1.5+",
-        "building_type": "house"
-    }
+#     default_params = {
+#         "api_key": API_KEY,
+#         "bedrooms": "3",
+#         "baths": "1.5+",
+#         "building_type": "house"
+#     }
 
-    params = location_params(location, default_params)
+#     params = location_params(location, default_params)
 
-    if not output:
-        raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
-    elif output == "from_json_dump":
-        # For testing purposes, just return a filename string to load an already saved JSON
-        data = json_to_df_from_disk("rentometer", "")
-    else:
-        save_to_disk = False if output == "direct_to_gsheets" else True
-        data = api_call_for_json(URL, params, "rentometer", save_to_disk=save_to_disk)
+#     if not output:
+#         raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
+#     elif output == "from_json_dump":
+#         # For testing purposes, just return a filename string to load an already saved JSON
+#         data = json_to_df_from_disk("rentometer", "")
+#     else:
+#         save_to_disk = False if output == "direct_to_gsheets" else True
+#         data = api_call_for_json(URL, params, "rentometer", save_to_disk=save_to_disk)
             
-    return data
+#     return data
 
 
-def rentcast_api(location, results=500, output=""):
-    # Write JSON dump from Rentcast API call.
-    API_KEY = os.getenv("RENTCAST_API_KEY")
-    URL = "https://api.rentcast.io/v1/properties"
-    data = None
+# def rentcast_api(location, results=500, output=""):
+#     # Write JSON dump from Rentcast API call.
+#     API_KEY = os.getenv("RENTCAST_API_KEY")
+#     URL = "https://api.rentcast.io/v1/properties"
+#     data = None
 
-    default_params = {
-        "api_key": API_KEY,
-        "bedrooms": "3",
-        "baths": "1.5+",
-        "price": "250000:550000",
-    }
+#     default_params = {
+#         "api_key": API_KEY,
+#         "bedrooms": "3",
+#         "baths": "1.5+",
+#         "price": "250000:550000",
+#     }
 
-    params = location_params(location, default_params)
+#     params = location_params(location, default_params)
 
-    headers = {
-        "X-API-KEY": API_KEY,
-    }
+#     headers = {
+#         "X-API-KEY": API_KEY,
+#     }
 
-    if not isinstance(results, int):
-        raise Exception("Error: please input a valid integer for the number of results requested.")
-    elif results > 500:
-        print("Offset required, as result exceeds limit of 500. Attempting multiple calls.")
-        multiple_rentcast_calls_with_offset(URL, params, headers, results, output)
-    else:
-        params["limit"] = results
-        if not output:
-            raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
-        elif output == "from_json_dump":
-            # For testing purposes, just return a filename string to load an already saved JSON
-            data = json_to_df_from_disk("rentcast", "")
-        else:
-            save_to_disk = False if output == "direct_to_gsheets" else True
-            data = api_call_for_json(URL, params, "rentcast", headers=headers, save_to_disk=save_to_disk)
+#     if not isinstance(results, int):
+#         raise Exception("Error: please input a valid integer for the number of results requested.")
+#     elif results > 500:
+#         print("Offset required, as result exceeds limit of 500. Attempting multiple calls.")
+#         multiple_rentcast_calls_with_offset(URL, params, headers, results, output)
+#     else:
+#         params["limit"] = results
+#         if not output:
+#             raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
+#         elif output == "from_json_dump":
+#             # For testing purposes, just return a filename string to load an already saved JSON
+#             data = json_to_df_from_disk("rentcast", "")
+#         else:
+#             save_to_disk = False if output == "direct_to_gsheets" else True
+#             data = api_call_for_json(URL, params, "rentcast", headers=headers, save_to_disk=save_to_disk)
 
-    return data
+#     return data
 
 
 def parse_rentcast_json_by_zip(data, zipcode):

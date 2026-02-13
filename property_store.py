@@ -1,7 +1,7 @@
-from property_schema import Property, PropertyData, LocationDetails, FeatureDetails, AttributeDetails, ValueDetails, Metadata
+from property_schema import Property, PropertyData
 from typing import Protocol, List
-from property_data_intake import rentcast_api, rentometer_api
-from property_level_analysis import parse_rentcast_data, add_rent_to_parsed_rentcast_data, add_costs_to_parsed_rentcast_data # , build_attributes, build_features, build_location, build_metadata, build_values
+from property_level_analysis import parse_rentcast_data, add_costs_to_parsed_rentcast_data
+from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
 
@@ -56,7 +56,7 @@ class RentcastPropertyProvider:
   """This follows the PropertyProvider Protocol and def request() outputs a partial property object."""
   def request(self, location) -> List[Property]:
     # TODO: check IF the information is available saved, and if not call the API for real, instead of calling the function but actually intake "from_json_dump"
-    rentcast_df = rentcast_api(location, output="from_json_dump")
+    rentcast_df = RentcastAPIClient().fetch(location, output="from_json_dump")
     # New functionality to build a partial property from Rentcast data specifically
     rentcast_subset_df = parse_rentcast_data(rentcast_df)
     # TODO: clearly designated where the renaming happens for Providers (_rename()?)
@@ -78,7 +78,7 @@ class RentcastPropertyProvider:
 
 class RentometerPropertyProvider:
   def request(self, location) -> List[Property]:
-    rentometer_df = rentometer_api(location, output="from_json_dump")
+    rentometer_df = RentometerAPIClient().fetch(location, output="from_json_dump")
     # New functionality to build a partial property from Rentometer data specifically
     rentometer_df = rentometer_df[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
     rentometer_df = rentometer_df.rename(columns={"quickview_url": "rentometer_url"})

@@ -2,7 +2,6 @@ from dataclasses import dataclass, field, fields
 from typing import Optional, List, TypeVar, get_origin, get_args, Any, Dict
 from abc import ABC
 from pandas import DataFrame, concat
-from collections import namedtuple
 
 
 class PropertyData(ABC):
@@ -154,10 +153,12 @@ class PropertyData(ABC):
 
         # Check for data completion before returning prop_dict_list.
         for prop_dict in prop_dict_list:
+            # NOTE: currently missing a lot of rentometer_data, so commenting out the data completion check for now.
             # data_sources = ["rentcast_data", "rentometer_data"]
             # for data_source in data_sources:
             #     if data_source not in prop_dict:
             #         print(f"Warning: address {prop_dict["address"]} is still missing {data_source}.")
+
             # Drop "address" to make iterating through prop_dict.values() easier: all dict values should be Property objects.
             del prop_dict["address"]
 

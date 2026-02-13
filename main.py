@@ -15,8 +15,8 @@ def zipcode_to_output(location, output):
     # TODO: confirm in what context I need to go zip -> lat_long -> address? For Rentometer?
     # lat_long = lat_long_from_zip(zip)
     # address = closest_address_to_lat_long(latitude, longitude)
-    rentometer_result = rentometer_api(location, output)
-    rentcast_result = rentcast_api(location, 100, output)
+    # rentometer_result = rentometer_api(location, output)
+    # rentcast_result = rentcast_api(location, 100, output)
     # parse_rentcast_json_by_zip("rentcast_2025-10-09_16-22-59.json", 98408)
     # rentometer_api("6478 S M St, Tacoma, WA 98408")
 
