@@ -4,6 +4,7 @@ from property_level_analysis import parse_rentcast_data, add_costs_to_parsed_ren
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 from enum import Enum, auto
 from json_loading import json_to_df_from_disk
+from pandas import DataFrame
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
 class PropertyGetOptions(Enum):
@@ -18,6 +19,10 @@ JSON_GET_OPTIONS = [
   PropertyGetOptions.JSON_FIRST_THEN_API_NO_UPDATE,
   PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON
 ]
+
+# TODO: 1) change APIClient functionality so API_ONLY/JSON_FIRST_THEN_API_NO_UPDATE and API_ONLY_JSON_DUMP/JSON_FIRSTblahblah replace save_to_disk stuff
+# 2) JSON_FIRST options actually have fall-through code (simulate then test)
+# 3) depreciate VALID_OPTIONS and add basic PropertyPublish code/interface for complete circuit again
 
 """When requesting data on a Property, first check storage."""
 class PropertyStore:
@@ -45,6 +50,8 @@ class PropertyStore:
 class PropertyProvider(Protocol):
   def request(location, option) -> List[Property]: ...
 
+  def _parse(self, df: DataFrame) -> DataFrame: ...
+
 """Interface for all data processors that, e.g., perform pandas analysis. Turn Property to DataFrame and back again."""
 class PropertyAnalyzer(Protocol):
   def analyze(prop_list: List[Property]) -> List[Property]: ...
@@ -62,7 +69,6 @@ class CompletePropertyProvider:
     rentometer_prop_list = rentometer_provider.request(location=location, option=option)
     all_prop_data = rentcast_prop_list + rentometer_prop_list
     combined_prop_list = PropertyData.combine_partial_prop_data(all_prop_data)
-    # TODO: also update analyzer to handle a list of properties
     combined_prop_analyzer = CompletePropertyAnalyzer()
     analyzed_prop_list = combined_prop_analyzer.analyze(combined_prop_list)
     for prop in analyzed_prop_list:
@@ -80,10 +86,15 @@ class RentcastPropertyProvider:
       rentcast_df = json_to_df_from_disk("rentcast", "")
     else:
       rentcast_df = RentcastAPIClient().fetch(location=location, option=option)
-    # New functionality to build a partial property from Rentcast data specifically
-    rentcast_subset_df = parse_rentcast_data(rentcast_df)
-    # TODO: clearly designated where the renaming happens for Providers (_rename()?)
-    rentcast_subset_df = rentcast_subset_df.rename(columns={
+
+    rentcast_subset_df = self._parse(rentcast_df)
+
+    prop_list = PropertyData.build_properties_from_dataframe(rentcast_subset_df)
+    return prop_list
+  
+  def _parse(self, df: DataFrame) -> DataFrame:
+    df = parse_rentcast_data(df)
+    df = df.rename(columns={
       "formattedAddress": "street_address",
       "value": "value_est",
       "zipCode": "zip_code",
@@ -94,10 +105,11 @@ class RentcastPropertyProvider:
       "assessorID": "assessor_ID",
       "legalDescription": "legal_description",
       "ownerOccupied": "owner_occupied"})
+    
     # TODO: actually get this from the Rentcast API finally
-    rentcast_subset_df["rentcast_url"] = "placeholder"
-    prop_list = PropertyData.build_properties_from_dataframe(rentcast_subset_df)
-    return prop_list
+    df["rentcast_url"] = "placeholder"
+    return df
+    
 
 class RentometerPropertyProvider:
   def request(self, location, option) -> List[Property]:
@@ -105,27 +117,25 @@ class RentometerPropertyProvider:
       rentometer_df = json_to_df_from_disk("rentometer", "")
     else:
       rentometer_df = RentometerAPIClient().fetch(location=location, option=option)
-    # New functionality to build a partial property from Rentometer data specifically
-    rentometer_df = rentometer_df[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
-    rentometer_df = rentometer_df.rename(columns={"quickview_url": "rentometer_url"})
-    rentometer_df = rentometer_df.drop_duplicates()
 
-    rentometer_df = rentometer_df.rename(columns={
+    rentometer_df = self._parse(rentometer_df)
+
+    prop_list = PropertyData.build_properties_from_dataframe(rentometer_df)
+    return prop_list
+  
+  def _parse(self, df: DataFrame) -> DataFrame:
+    df = df[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
+    df = df.drop_duplicates()
+
+    df = df.rename(columns={
+      "quickview_url": "rentometer_url",
       "address": "street_address",
       "mean": "mean_rent_est",
       "median": "median_rent_est",
       "min": "min_rent",
       "max": "max_rent"})
     
-    # Check if the address exists
-    # exists = (rentometer_df['street_address'] == '6478 S M St, Tacoma, WA 98408').any()
-    # print(f"Address found in rentometer_df: {exists}")
-
-    prop_list = PropertyData.build_properties_from_dataframe(rentometer_df)
-    # for prop in prop_list:
-    #   if prop.location.street_address == '6478 S M St, Tacoma, WA 98408':
-    #     print("it's also in prop_list!")
-    return prop_list
+    return df
 
 class CompletePropertyAnalyzer:
   """Include analysis that requires, e.g., data from both Rentcast and Rentometer."""
