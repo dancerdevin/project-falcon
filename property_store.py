@@ -3,6 +3,7 @@ from typing import Protocol, List
 from property_level_analysis import parse_rentcast_data, add_costs_to_parsed_rentcast_data
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 from enum import Enum, auto
+from json_loading import json_to_df_from_disk
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
 class PropertyGetOptions(Enum):
@@ -12,6 +13,11 @@ class PropertyGetOptions(Enum):
   API_ONLY = auto()
   API_ONLY_AND_JSON_DUMP = auto()
 
+JSON_GET_OPTIONS = [
+  PropertyGetOptions.JSON_ONLY,
+  PropertyGetOptions.JSON_FIRST_THEN_API_NO_UPDATE,
+  PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON
+]
 
 """When requesting data on a Property, first check storage."""
 class PropertyStore:
@@ -27,17 +33,17 @@ class PropertyStore:
       pass # ... check if it's the location we're looking for etc then return
     option = ""
     if get_option == PropertyGetOptions.JSON_ONLY:
-      option = "from_json_dump"
+      option = PropertyGetOptions.JSON_ONLY
     if not option:
       raise Exception("Error: option string was not set from get_option parameter.")
 
     property_provider = CompletePropertyProvider()
-    prop_list = property_provider.request(location=location, output=option)
+    prop_list = property_provider.request(location=location, option=option)
     return prop_list
 
 """Interface for intake that sets expectations for all data providers, e.g., RentcastPropertyProvider."""
 class PropertyProvider(Protocol):
-  def request(location, output) -> List[Property]: ... #change "output" to "option"
+  def request(location, option) -> List[Property]: ...
 
 """Interface for all data processors that, e.g., perform pandas analysis. Turn Property to DataFrame and back again."""
 class PropertyAnalyzer(Protocol):
@@ -45,15 +51,15 @@ class PropertyAnalyzer(Protocol):
 
 class CompletePropertyProvider:
   # List distinct PropertyProviders and go through them as needed. This will return a completely initialized Property object.
-  def request(self, location, output) -> List[Property]:
+  def request(self, location, option) -> List[Property]:
     rentcast_provider = RentcastPropertyProvider()
-    rentcast_prop_list = rentcast_provider.request(location=location, output=output)
+    rentcast_prop_list = rentcast_provider.request(location=location, option=option)
     for prop in rentcast_prop_list:
       if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
         print("address found from RentcastProvider")
         print(prop)
     rentometer_provider = RentometerPropertyProvider()
-    rentometer_prop_list = rentometer_provider.request(location=location, output=output)
+    rentometer_prop_list = rentometer_provider.request(location=location, option=option)
     all_prop_data = rentcast_prop_list + rentometer_prop_list
     combined_prop_list = PropertyData.combine_partial_prop_data(all_prop_data)
     # TODO: also update analyzer to handle a list of properties
@@ -68,9 +74,12 @@ class CompletePropertyProvider:
 
 class RentcastPropertyProvider:
   """This follows the PropertyProvider Protocol and def request() outputs a partial property object."""
-  def request(self, location, output) -> List[Property]:
+  def request(self, location, option) -> List[Property]:
     # TODO: check IF the information is available saved, and if not call the API for real, instead of calling the function but actually intake "from_json_dump"
-    rentcast_df = RentcastAPIClient().fetch(location=location, output=output)
+    if option in JSON_GET_OPTIONS:
+      rentcast_df = json_to_df_from_disk("rentcast", "")
+    else:
+      rentcast_df = RentcastAPIClient().fetch(location=location, option=option)
     # New functionality to build a partial property from Rentcast data specifically
     rentcast_subset_df = parse_rentcast_data(rentcast_df)
     # TODO: clearly designated where the renaming happens for Providers (_rename()?)
@@ -91,8 +100,11 @@ class RentcastPropertyProvider:
     return prop_list
 
 class RentometerPropertyProvider:
-  def request(self, location, output) -> List[Property]:
-    rentometer_df = RentometerAPIClient().fetch(location=location, output=output)
+  def request(self, location, option) -> List[Property]:
+    if option in JSON_GET_OPTIONS:
+      rentometer_df = json_to_df_from_disk("rentometer", "")
+    else:
+      rentometer_df = RentometerAPIClient().fetch(location=location, option=option)
     # New functionality to build a partial property from Rentometer data specifically
     rentometer_df = rentometer_df[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
     rentometer_df = rentometer_df.rename(columns={"quickview_url": "rentometer_url"})

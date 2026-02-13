@@ -31,9 +31,9 @@ class RentcastAPIClient:
         params["limit"] = results
         if not output:
             raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
-        elif output == "from_json_dump":
-            # For testing purposes, just return a filename string to load an already saved JSON
-            data = json_to_df_from_disk("rentcast", "")
+        # elif output == "from_json_dump":
+        #     # For testing purposes, just return a filename string to load an already saved JSON
+        #     data = json_to_df_from_disk("rentcast", "")
         else:
             save_to_disk = False if output == "direct_to_gsheets" else True
             data = api_call_for_json(URL, params, "rentcast", headers=headers, save_to_disk=save_to_disk)
@@ -58,11 +58,12 @@ class RentometerAPIClient:
 
     params = location_params(location, default_params)
 
+    # TODO: at this stage, "publishing" shouldn't matter, and "from_json_dump" shouldn't even require instantiating this class
     if not output:
         raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
-    elif output == "from_json_dump":
-        # For testing purposes, just return a filename string to load an already saved JSON
-        data = json_to_df_from_disk("rentometer", "")
+    # elif output == "from_json_dump":
+    #     # For testing purposes, just return a filename string to load an already saved JSON
+    #     data = json_to_df_from_disk("rentometer", "")
     else:
         save_to_disk = False if output == "direct_to_gsheets" else True
         data = api_call_for_json(URL, params, "rentometer", save_to_disk=save_to_disk)
