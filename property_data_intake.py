@@ -4,23 +4,19 @@ import pgeocode
 from dotenv import load_dotenv
 from datetime import datetime
 from geopy.geocoders import Nominatim
-import math
 import pandas as pd
-from json_loading import json_to_df_from_disk
 from io import StringIO
 
 
 load_dotenv() # Load API keys
 geolocator = Nominatim(user_agent="peregrin_app") # Instantiate address-finder
 
-# TODO: PropertyIntake protocol for RentcastPropertyIntake/RentometerPropertyIntake .get() with overrides
-
-VALID_OUTPUTS = [
-    "dump_to_disk_no_pub",      # Call API, save to disk, stop there
-    "dump_to_disk_then_pub",    # Call API, save to disk, then pass on to Gsheets
-    "direct_to_gsheets",        # Call API, don't save to disk, pass on to Gsheets
-    "from_json_dump"            # Do not call API, pass existing JSON dump to Gsheets
-]
+# VALID_OUTPUTS = [
+#     "dump_to_disk_no_pub",      # Call API, save to disk, stop there
+#     "dump_to_disk_then_pub",    # Call API, save to disk, then pass on to Gsheets
+#     "direct_to_gsheets",        # Call API, don't save to disk, pass on to Gsheets
+#     "from_json_dump"            # Do not call API, pass existing JSON dump to Gsheets
+# ]
 
 
 def lat_long_from_zip(zip_code):
@@ -95,23 +91,6 @@ def api_call_for_json(url, params, name_string, save_to_disk=True, headers={}):
 
     except requests.exceptions.RequestException as err:
         print(f"Error: {err}")
-
-
-def multiple_rentcast_calls_with_offset(URL, params, headers, results, output):
-    number_of_calls = math.ceil(results / 500)
-    # TODO: incorporate redundant code into json_loading functionality
-    df_list = []
-    for i in range(1, number_of_calls):
-        params["offset"] = str(i * 500)
-        print("Attempting API call with offset of " + params["offset"])
-        save_to_disk = True if output == "dump_to_disk" else False
-        data = api_call_for_json(URL, params, "rentcast", headers, save_to_disk)
-        with open(data, "r", encoding="utf-8-sig") as json_dump:
-            print(f"Concatenating data subset {i} to dataframe")
-            df = pd.read_json(StringIO(json_dump))
-    df_list.append(df)
-    complete_df = pd.concat(df_list, ignore_index=True)
-    return complete_df
 
 
 def parse_rentcast_json_by_zip(data, zipcode):

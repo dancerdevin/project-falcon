@@ -39,7 +39,12 @@ def parse_rentcast_data(df):
 
     # Drop now-unpacked columns with dicts to allow for dropping duplicates
     # NOTE: Currently not storing information on owner, sale history, or HOA. Can change this / refactor Property to contain if needed
-    df = df.drop(["taxAssessments", "propertyTaxes", "features", "owner", "history", "hoa"], axis=1)
+    cols_to_drop = []
+    cols_to_check_to_drop = ["taxAssessments", "propertyTaxes", "features", "owner", "history", "hoa"]
+    for col in cols_to_check_to_drop:
+        if col in df.columns:
+            cols_to_drop.append(col)
+    df = df.drop(cols_to_drop, axis=1)
     # TODO: convert other "objects" into Pandas datatypes for ease of analysis? here or at analysis stage?
 
     # Ignore "filename" as this will be differ on duplicate data taken from different JSON dumps. Just keep first

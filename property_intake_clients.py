@@ -1,10 +1,16 @@
-from property_data_intake import location_params, json_to_df_from_disk, api_call_for_json, multiple_rentcast_calls_with_offset
+from property_data_intake import location_params, api_call_for_json
 import os
+from property_get_options import UPDATE_JSON_OPTIONS
+import math
+import pandas as pd
+from io import StringIO
+
 
 # TODO: standardize format of fetch() between intake API clients however possible
 class RentcastAPIClient:
-   def fetch(self, location, results=500, output=""):
-      # Write JSON dump from Rentcast API call.
+   def fetch(self, location, option, results=500):
+    print("Calling Rentcast API function for " + str(location))
+    # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
     URL = "https://api.rentcast.io/v1/properties"
     data = None
@@ -26,25 +32,39 @@ class RentcastAPIClient:
         raise Exception("Error: please input a valid integer for the number of results requested.")
     elif results > 500:
         print("Offset required, as result exceeds limit of 500. Attempting multiple calls.")
-        multiple_rentcast_calls_with_offset(URL, params, headers, results, output)
+        self._multiple_rentcast_calls_with_offset(URL, params, headers, results, option)
     else:
         params["limit"] = results
-        if not output:
-            raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
-        # elif output == "from_json_dump":
-        #     # For testing purposes, just return a filename string to load an already saved JSON
-        #     data = json_to_df_from_disk("rentcast", "")
+        if not option:
+            raise Exception("Error: please specify PropertyGetOption")
+
         else:
-            save_to_disk = False if output == "direct_to_gsheets" else True
+            save_to_disk = True if option in UPDATE_JSON_OPTIONS else False
             data = api_call_for_json(URL, params, "rentcast", headers=headers, save_to_disk=save_to_disk)
 
     return data
+   
+   def _multiple_rentcast_calls_with_offset(URL, params, headers, results, option):
+    number_of_calls = math.ceil(results / 500)
+    # TODO: incorporate redundant code into json_loading functionality
+    df_list = []
+    for i in range(1, number_of_calls):
+        params["offset"] = str(i * 500)
+        print("Attempting API call with offset of " + params["offset"])
+        save_to_disk = True if option in UPDATE_JSON_OPTIONS else False
+        data = api_call_for_json(URL, params, "rentcast", headers, save_to_disk)
+        with open(data, "r", encoding="utf-8-sig") as json_dump:
+            print(f"Concatenating data subset {i} to dataframe")
+            df = pd.read_json(StringIO(json_dump))
+    df_list.append(df)
+    complete_df = pd.concat(df_list, ignore_index=True)
+    return complete_df
 
 
 class RentometerAPIClient:
-  def fetch(self, location, output=""):
+  def fetch(self, location, option):
     # Write JSON dump from Rentometer API call.
-    print("Calling rentometer API function for " + str(location))
+    print("Calling Rentometer API function for " + str(location))
     API_KEY = os.getenv("RENTOMETER_API_KEY")
     URL = "https://www.rentometer.com/api/v1/summary"
     data = None
@@ -58,14 +78,10 @@ class RentometerAPIClient:
 
     params = location_params(location, default_params)
 
-    # TODO: at this stage, "publishing" shouldn't matter, and "from_json_dump" shouldn't even require instantiating this class
-    if not output:
-        raise Exception("Error: please specify output from list of VALID_OUTPUTS.")
-    # elif output == "from_json_dump":
-    #     # For testing purposes, just return a filename string to load an already saved JSON
-    #     data = json_to_df_from_disk("rentometer", "")
+    if not option:
+        raise Exception("Error: please specify PropertyGetOption")
     else:
-        save_to_disk = False if output == "direct_to_gsheets" else True
+        save_to_disk = True if option in UPDATE_JSON_OPTIONS else False
         data = api_call_for_json(URL, params, "rentometer", save_to_disk=save_to_disk)
             
     return data

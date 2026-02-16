@@ -9,8 +9,8 @@ from property_store import PropertyStore
 
 
 def zipcode_to_output(location, output):
-    if output not in VALID_OUTPUTS:
-        raise Exception("Error: requested output not in list of valid outputs.")
+    # if output not in VALID_OUTPUTS:
+    #     raise Exception("Error: requested output not in list of valid outputs.")
     
     # TODO: confirm in what context I need to go zip -> lat_long -> address? For Rentometer?
     # lat_long = lat_long_from_zip(zip)

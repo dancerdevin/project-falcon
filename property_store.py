@@ -2,25 +2,13 @@ from property_schema import Property, PropertyData
 from typing import Protocol, List
 from property_level_analysis import parse_rentcast_data, add_costs_to_parsed_rentcast_data
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
-from enum import Enum, auto
+from property_get_options import PropertyGetOptions, JSON_GET_OPTIONS
 from json_loading import json_to_df_from_disk
 from pandas import DataFrame
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
-class PropertyGetOptions(Enum):
-  JSON_ONLY = auto()
-  JSON_FIRST_THEN_API_NO_UPDATE = auto()
-  JSON_FIRST_THEN_API_AND_UPDATE_JSON = auto()
-  API_ONLY = auto()
-  API_ONLY_AND_JSON_DUMP = auto()
-
-JSON_GET_OPTIONS = [
-  PropertyGetOptions.JSON_ONLY,
-  PropertyGetOptions.JSON_FIRST_THEN_API_NO_UPDATE,
-  PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON
-]
-
 # TODO: 1) change APIClient functionality so API_ONLY/JSON_FIRST_THEN_API_NO_UPDATE and API_ONLY_JSON_DUMP/JSON_FIRSTblahblah replace save_to_disk stuff
+# (save_to_disk is technically still there as an intermediary but the GetOptions are working now)
 # 2) JSON_FIRST options actually have fall-through code (simulate then test)
 # 3) depreciate VALID_OPTIONS and add basic PropertyPublish code/interface for complete circuit again
 
@@ -37,8 +25,11 @@ class PropertyStore:
     if self.cached_property:
       pass # ... check if it's the location we're looking for etc then return
     option = ""
+    # I'm just doing this check to make sure I don't pass through a GetOption my code isn't yet ready to hnadle
     if get_option == PropertyGetOptions.JSON_ONLY:
       option = PropertyGetOptions.JSON_ONLY
+    if get_option == PropertyGetOptions.API_ONLY_AND_JSON_DUMP:
+      option = PropertyGetOptions.API_ONLY_AND_JSON_DUMP
     if not option:
       raise Exception("Error: option string was not set from get_option parameter.")
 
@@ -154,7 +145,7 @@ if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'
   # another test address: "6478 S M St, Tacoma, WA 98408"
   prop_store = PropertyStore()
-  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408")
+  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408", get_option=PropertyGetOptions.API_ONLY_AND_JSON_DUMP)
   for prop in prop_list:
     if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
       print(prop)
