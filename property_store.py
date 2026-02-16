@@ -2,7 +2,7 @@ from property_schema import Property, PropertyData
 from typing import Protocol, List
 from property_level_analysis import parse_rentcast_data, add_costs_to_parsed_rentcast_data
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
-from property_get_options import PropertyGetOptions, JSON_GET_OPTIONS
+from property_get_options import PropertyGetOptions, JSON_GET_OPTIONS, JSON_FIRST_OPTIONS
 from json_loading import json_to_df_from_disk
 from pandas import DataFrame
 
@@ -75,7 +75,7 @@ class RentcastPropertyProvider:
     # TODO: check IF the information is available saved, and if not call the API for real, instead of calling the function but actually intake "from_json_dump"
     if option in JSON_GET_OPTIONS:
       rentcast_df = json_to_df_from_disk("rentcast", "")
-    else:
+    if option in JSON_FIRST_OPTIONS or option not in JSON_GET_OPTIONS: # Encompasses 1) fall-through for JSON-first or 2) API call only.
       rentcast_df = RentcastAPIClient().fetch(location=location, option=option)
 
     rentcast_subset_df = self._parse(rentcast_df)
@@ -106,7 +106,7 @@ class RentometerPropertyProvider:
   def request(self, location, option) -> List[Property]:
     if option in JSON_GET_OPTIONS:
       rentometer_df = json_to_df_from_disk("rentometer", "")
-    else:
+    if option in JSON_FIRST_OPTIONS or option not in JSON_GET_OPTIONS: # Encompasses 1) fall-through for JSON-first or 2) API call only. 
       rentometer_df = RentometerAPIClient().fetch(location=location, option=option)
 
     rentometer_df = self._parse(rentometer_df)
