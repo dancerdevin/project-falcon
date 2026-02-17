@@ -7,10 +7,7 @@ from json_loading import json_to_df_from_disk
 from pandas import DataFrame
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
-# TODO: 1) change APIClient functionality so API_ONLY/JSON_FIRST_THEN_API_NO_UPDATE and API_ONLY_JSON_DUMP/JSON_FIRSTblahblah replace save_to_disk stuff
-# (save_to_disk is technically still there as an intermediary but the GetOptions are working now)
-# 2) JSON_FIRST options actually have fall-through code (simulate then test)
-# 3) depreciate VALID_OPTIONS and add basic PropertyPublish code/interface for complete circuit again
+# TODO: add basic PropertyPublish code/interface for complete circuit again
 
 """When requesting data on a Property, first check storage."""
 class PropertyStore:
@@ -24,17 +21,9 @@ class PropertyStore:
     # the real point here is to add data validation checks and have some work so let's just do that first
     if self.cached_property:
       pass # ... check if it's the location we're looking for etc then return
-    option = ""
-    # I'm just doing this check to make sure I don't pass through a GetOption my code isn't yet ready to hnadle
-    if get_option == PropertyGetOptions.JSON_ONLY:
-      option = PropertyGetOptions.JSON_ONLY
-    if get_option == PropertyGetOptions.API_ONLY_AND_JSON_DUMP:
-      option = PropertyGetOptions.API_ONLY_AND_JSON_DUMP
-    if not option:
-      raise Exception("Error: option string was not set from get_option parameter.")
 
     property_provider = CompletePropertyProvider()
-    prop_list = property_provider.request(location=location, option=option)
+    prop_list = property_provider.request(location=location, option=get_option)
     return prop_list
 
 """Interface for intake that sets expectations for all data providers, e.g., RentcastPropertyProvider."""
@@ -48,34 +37,35 @@ class PropertyAnalyzer(Protocol):
   def analyze(prop_list: List[Property]) -> List[Property]: ...
 
 class CompletePropertyProvider:
-  # List distinct PropertyProviders and go through them as needed. This will return a completely initialized Property object.
+  """List distinct PropertyProviders and go through them as needed. This will return a completely initialized Property object."""
   def request(self, location, option) -> List[Property]:
     rentcast_provider = RentcastPropertyProvider()
     rentcast_prop_list = rentcast_provider.request(location=location, option=option)
-    for prop in rentcast_prop_list:
-      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
-        print("address found from RentcastProvider")
-        print(prop)
+    # for prop in rentcast_prop_list:
+    #   if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
+    #     print("address found from RentcastProvider")
+    #     print(prop)
     rentometer_provider = RentometerPropertyProvider()
     rentometer_prop_list = rentometer_provider.request(location=location, option=option)
     all_prop_data = rentcast_prop_list + rentometer_prop_list
     combined_prop_list = PropertyData.combine_partial_prop_data(all_prop_data)
     combined_prop_analyzer = CompletePropertyAnalyzer()
     analyzed_prop_list = combined_prop_analyzer.analyze(combined_prop_list)
-    for prop in analyzed_prop_list:
-      if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
-        print("address found in analyzed_prop_list")
-        print(prop)
+    # for prop in analyzed_prop_list:
+    #   if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
+    #     print("address found in analyzed_prop_list")
+    #     print(prop)
     return analyzed_prop_list
 
 
 class RentcastPropertyProvider:
   """This follows the PropertyProvider Protocol and def request() outputs a partial property object."""
   def request(self, location, option) -> List[Property]:
-    # TODO: check IF the information is available saved, and if not call the API for real, instead of calling the function but actually intake "from_json_dump"
     if option in JSON_GET_OPTIONS:
       rentcast_df = json_to_df_from_disk("rentcast", "")
-    if option in JSON_FIRST_OPTIONS or option not in JSON_GET_OPTIONS: # Encompasses 1) fall-through for JSON-first or 2) API call only.
+      # TODO: needs to fall-through if this returns empty / can't find actual location in the data
+      # NOTE: write function to, based on location parameter, check the DF for it / remove irrelevant info (and if none is relevant, return empty?)
+    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentcast_df.empty()): # Encompass 1) fall-through for JSON-first or 2) API call only.
       rentcast_df = RentcastAPIClient().fetch(location=location, option=option)
 
     rentcast_subset_df = self._parse(rentcast_df)
@@ -106,7 +96,7 @@ class RentometerPropertyProvider:
   def request(self, location, option) -> List[Property]:
     if option in JSON_GET_OPTIONS:
       rentometer_df = json_to_df_from_disk("rentometer", "")
-    if option in JSON_FIRST_OPTIONS or option not in JSON_GET_OPTIONS: # Encompasses 1) fall-through for JSON-first or 2) API call only. 
+    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentometer_df.empty()):
       rentometer_df = RentometerAPIClient().fetch(location=location, option=option)
 
     rentometer_df = self._parse(rentometer_df)
@@ -145,7 +135,7 @@ if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'
   # another test address: "6478 S M St, Tacoma, WA 98408"
   prop_store = PropertyStore()
-  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408", get_option=PropertyGetOptions.API_ONLY_AND_JSON_DUMP)
+  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408", get_option=PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON)
   for prop in prop_list:
     if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
       print(prop)

@@ -1,4 +1,4 @@
-from property_data_intake import *
+from property_intake_func import *
 from property_level_analysis import *
 from spreadsheets import *
 from property_schema import *

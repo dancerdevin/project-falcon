@@ -1,4 +1,4 @@
-from property_data_intake import location_params, api_call_for_json
+from property_intake_func import location_params, api_call_for_json
 import os
 from property_get_options import UPDATE_JSON_OPTIONS
 import math
