@@ -34,7 +34,7 @@ def lat_long_from_zip(zip_code):
     return [str(latitude), str(longitude)] # Stringify for API call and return as list
 
 
-def location_params(location, params):
+def location_params(location, params={}):
     # Meta-function to determine if API call will be passed an address or a lat-long.
     if isinstance(location, str):
         if " " not in location: # Infer input without whitespace is stringified zipcode
@@ -100,12 +100,22 @@ def parse_rentcast_json_by_zip(data, zipcode):
     subset_data = [entry for entry in json_data if entry.get("zipCode") == str(zipcode)]
 
 
-def fall_through_to_api_check(df, location):
+def find_location_matches_in_cleaned_df(cleaned_df, location):
     """For a PropertyProvider, check if a DataFrame retrieved from JSON dumps contains target location.
     If not, return empty DF to trigger fall-through to an external API call."""
     params = location_params(location)
-    # TODO: parse dataframe BEFORE calling this to standardize column names when checking DataFrame contents?
 
+    # Possible keys: "address", "zipCode", "latitude", "longitude." Assume I'm asking exclusively for 1) address, 2) zip, 3) lat-long
+    if "address" in params:
+        subset_df = cleaned_df[cleaned_df["street_address"] == params["address"]]
+    elif "zipCode" in params:
+        subset_df = cleaned_df[cleaned_df["zip_code"] == params["zipCode"]]
+    elif "latitude" in params and "longitude" in params:
+        subset_df = cleaned_df[cleaned_df["latitude"] == params["latitude"] and cleaned_df["longitude"] == params["longitude"]]
+    else:
+        raise Exception("Error: location_params() returned no recognized keys in params dict.")
+
+    return subset_df # If there are no matches, subset_df.empty will return True.
 
 # lat_long = lat_long_from_zip(98408)
 # address = closest_address_to_lat_long(latitude, longitude)

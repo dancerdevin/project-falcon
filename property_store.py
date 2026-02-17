@@ -4,6 +4,7 @@ from property_level_analysis import parse_rentcast_data, add_costs_to_parsed_ren
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 from property_get_options import PropertyGetOptions, JSON_GET_OPTIONS, JSON_FIRST_OPTIONS
 from json_loading import json_to_df_from_disk
+from property_intake_func import find_location_matches_in_cleaned_df
 from pandas import DataFrame
 
 """Store and retrieve Property objects, calling intake APIs when needed data is not already stored."""
@@ -30,7 +31,7 @@ class PropertyStore:
 class PropertyProvider(Protocol):
   def request(location, option) -> List[Property]: ...
 
-  def _parse(self, df: DataFrame) -> DataFrame: ...
+  def _clean(self, df: DataFrame) -> DataFrame: ...
 
 """Interface for all data processors that, e.g., perform pandas analysis. Turn Property to DataFrame and back again."""
 class PropertyAnalyzer(Protocol):
@@ -61,19 +62,28 @@ class CompletePropertyProvider:
 class RentcastPropertyProvider:
   """This follows the PropertyProvider Protocol and def request() outputs a partial property object."""
   def request(self, location, option) -> List[Property]:
+    rentcast_df = DataFrame()
     if option in JSON_GET_OPTIONS:
       rentcast_df = json_to_df_from_disk("rentcast", "")
       # TODO: needs to fall-through if this returns empty / can't find actual location in the data
       # NOTE: write function to, based on location parameter, check the DF for it / remove irrelevant info (and if none is relevant, return empty?)
-    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentcast_df.empty()): # Encompass 1) fall-through for JSON-first or 2) API call only.
+      rentcast_df = self._clean(rentcast_df)
+      rentcast_df = find_location_matches_in_cleaned_df(rentcast_df, location)
+      print(f"Number of rows in rentcast_df after JSON location match check: {len(rentcast_df)}")
+
+    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentcast_df.empty): # Encompass 1) fall-through for JSON-first or 2) API call only.
       rentcast_df = RentcastAPIClient().fetch(location=location, option=option)
+      rentcast_df = self._clean(rentcast_df)
+      rentcast_df = find_location_matches_in_cleaned_df(rentcast_df, location)
+      print(f"Number of rows in rentcast_df after API location match check: {len(rentcast_df)}")
 
-    rentcast_subset_df = self._parse(rentcast_df)
+    if rentcast_df.empty:
+      print("Warning: No properties associated with that location could be found in the Rentcast data.")
 
-    prop_list = PropertyData.build_properties_from_dataframe(rentcast_subset_df)
+    prop_list = PropertyData.build_properties_from_dataframe(rentcast_df)
     return prop_list
   
-  def _parse(self, df: DataFrame) -> DataFrame:
+  def _clean(self, df: DataFrame) -> DataFrame:
     df = parse_rentcast_data(df)
     df = df.rename(columns={
       "formattedAddress": "street_address",
@@ -96,15 +106,20 @@ class RentometerPropertyProvider:
   def request(self, location, option) -> List[Property]:
     if option in JSON_GET_OPTIONS:
       rentometer_df = json_to_df_from_disk("rentometer", "")
-    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentometer_df.empty()):
-      rentometer_df = RentometerAPIClient().fetch(location=location, option=option)
+      rentometer_df = self._clean(rentometer_df)
+      rentometer_df = find_location_matches_in_cleaned_df(rentometer_df, location)
+      print(f"Number of rows in rentometer_df after JSON location match check: {len(rentometer_df)}")
 
-    rentometer_df = self._parse(rentometer_df)
+    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentometer_df.empty):
+      rentometer_df = RentometerAPIClient().fetch(location=location, option=option)
+      rentometer_df = self._clean(rentometer_df)
+      rentometer_df = find_location_matches_in_cleaned_df(rentometer_df, location)
+      print(f"Number of rows in rentometer_df after API location match check: {len(rentometer_df)}")
 
     prop_list = PropertyData.build_properties_from_dataframe(rentometer_df)
     return prop_list
   
-  def _parse(self, df: DataFrame) -> DataFrame:
+  def _clean(self, df: DataFrame) -> DataFrame:
     df = df[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
     df = df.drop_duplicates()
 
@@ -135,7 +150,6 @@ if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'
   # another test address: "6478 S M St, Tacoma, WA 98408"
   prop_store = PropertyStore()
-  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408", get_option=PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON)
+  prop_list = prop_store.get("6438 S L St, Tacoma, WA 98408", get_option=PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON)
   for prop in prop_list:
-    if prop.location.street_address == "6478 S M St, Tacoma, WA 98408":
-      print(prop)
+    print(prop)

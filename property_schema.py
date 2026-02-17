@@ -23,7 +23,10 @@ class PropertyData(ABC):
     @staticmethod
     def build_properties_from_dataframe(df: DataFrame) -> List["Property"]:
         """Generate list of Properties, each one corresponding to a row in a DataFrame."""
-        return [PropertyData._build_property_from_row(row) for row in df.itertuples(index=False)]
+        if df.empty: # Finding location matches may have found no matches and so passed an empty DataFrame.
+            return []
+        else:
+            return [PropertyData._build_property_from_row(row) for row in df.itertuples(index=False)]
     
     @staticmethod
     def _build_property_from_row(row, prop=None) -> "Property":

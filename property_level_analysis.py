@@ -99,6 +99,7 @@ def add_costs_to_parsed_rentcast_data(df):
     # print(df.info(verbose=True))
 
     data_type_dict = { # Defaulting to floats for now even if ints might suffice for some
+        "value_est": float64,
         "mean_rent_est": float64,
         "median_rent_est": float64,
         "min_rent": float64,
