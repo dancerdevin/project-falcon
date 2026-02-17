@@ -5,9 +5,6 @@ from json_loading import json_to_df_from_disk, json_to_list_of_dicts
 from datetime import datetime
 from amortization.amount import calculate_amortization_amount
 
-# TODO: currently: unpack list of property objects into dict to send to gsheet output
-# then/or create Spreadsheet object to store formatting information and also plug THAT in
-# TODO: generally, use Property objects instead of address_dict, once those are defined in property_data, and build plug-in for Gsheets
 
 LOAN_TO_VALUE = .7
 APR = 0.07
@@ -45,7 +42,6 @@ def parse_rentcast_data(df):
         if col in df.columns:
             cols_to_drop.append(col)
     df = df.drop(cols_to_drop, axis=1)
-    # TODO: convert other "objects" into Pandas datatypes for ease of analysis? here or at analysis stage?
 
     # Ignore "filename" as this will be differ on duplicate data taken from different JSON dumps. Just keep first
     cols_to_check = [col for col in df.columns if col != 'filename']
@@ -56,42 +52,34 @@ def parse_rentcast_data(df):
     return subset_df
 
 
-def add_rent_to_parsed_rentcast_data(rentcast_data, rentometer_data):
-    # For each address in parsed rentcast data, find rent data, add as expected income, and return dataframe.
-    if ExpectedColumns.PROPERTY_TAX not in rentcast_data.columns.to_list():
-        raise Exception("Error: property tax column missing. First call rentcast_data_parser on dataframe input.")
+# def add_rent_to_parsed_rentcast_data(rentcast_data, rentometer_data):
+#     # For each address in parsed rentcast data, find rent data, add as expected income, and return dataframe.
+#     if ExpectedColumns.PROPERTY_TAX not in rentcast_data.columns.to_list():
+#         raise Exception("Error: property tax column missing. First call rentcast_data_parser on dataframe input.")
     
-    # If I've specified a datetime, the JSON dumps already exist on disk. If not, make necessary API calls.
-    # For each address in the parsed_data, apply rentometer_api function in property_data.
-    # if datetime_string is None:
-    #     datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    #     parsed_data["formattedAddress"].apply(rentometer_api)
+#     subset_rent_data = rentometer_data[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
+#     subset_rent_data = subset_rent_data.rename(columns={"quickview_url": "rentometer_url"})
+#     subset_rent_data = subset_rent_data.drop_duplicates()
 
-    # Load JSON dumps saved to disk from relevant datetime (right before making API calls) and concatenate into dataframe.
-    # rent_data = json_to_df("rentometer", datetime_string)
-    subset_rent_data = rentometer_data[["address", "mean", "median", "min", "max", "quickview_url"]].reset_index(drop=True)
-    subset_rent_data = subset_rent_data.rename(columns={"quickview_url": "rentometer_url"})
-    subset_rent_data = subset_rent_data.drop_duplicates()
+#     # Convert relevant columns to matching floats
+#     cols_to_convert = ["median", "min", "max"]
+#     subset_rent_data[cols_to_convert] = subset_rent_data[cols_to_convert].astype(float64)
 
-    # Convert relevant columns to matching floats
-    cols_to_convert = ["median", "min", "max"]
-    subset_rent_data[cols_to_convert] = subset_rent_data[cols_to_convert].astype(float64)
-
-    # Match addresses between parsed_data and new Rentometer JSON dumps, add Rentometer data, and return.
-    rentcast_data = rentcast_data.rename(columns={"formattedAddress": "address"})
-    rentcast_data["address"] = rentcast_data["address"].astype(str)
-    subset_rent_data["address"] = subset_rent_data["address"].astype(str)
+#     # Match addresses between parsed_data and new Rentometer JSON dumps, add Rentometer data, and return.
+#     rentcast_data = rentcast_data.rename(columns={"formattedAddress": "address"})
+#     rentcast_data["address"] = rentcast_data["address"].astype(str)
+#     subset_rent_data["address"] = subset_rent_data["address"].astype(str)
     
-    # Debug: check for matching addresses
-    # TODO: normalize addresses during data intake?
-    rentcast_addresses = set(rentcast_data["address"].unique())
-    rentometer_addresses = set(subset_rent_data["address"].unique())
-    print(f"Rentcast addresses: {rentcast_addresses}")
-    print(f"Rentometer addresses: {rentometer_addresses}")
-    print(f"Common addresses: {rentcast_addresses & rentometer_addresses}")
+#     # Debug: check for matching addresses
+#     # TODO: normalize addresses during data intake?
+#     rentcast_addresses = set(rentcast_data["address"].unique())
+#     rentometer_addresses = set(subset_rent_data["address"].unique())
+#     print(f"Rentcast addresses: {rentcast_addresses}")
+#     print(f"Rentometer addresses: {rentometer_addresses}")
+#     print(f"Common addresses: {rentcast_addresses & rentometer_addresses}")
     
-    joined_data = pd.merge(rentcast_data, subset_rent_data, on="address", how="inner") # Presumes exact same address string
-    return joined_data
+#     joined_data = pd.merge(rentcast_data, subset_rent_data, on="address", how="inner") # Presumes exact same address string
+#     return joined_data
 
 
 def add_costs_to_parsed_rentcast_data(df):

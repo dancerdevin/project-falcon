@@ -150,6 +150,6 @@ if __name__ == "__main__":
   # Test address: '5214 S Thompson Ave, Tacoma, WA 98408'
   # another test address: "6478 S M St, Tacoma, WA 98408"
   prop_store = PropertyStore()
-  prop_list = prop_store.get("6438 S L St, Tacoma, WA 98408", get_option=PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON)
+  prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408", get_option=PropertyGetOptions.JSON_ONLY)
   for prop in prop_list:
     print(prop)
