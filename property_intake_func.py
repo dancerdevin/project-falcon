@@ -100,6 +100,13 @@ def parse_rentcast_json_by_zip(data, zipcode):
     subset_data = [entry for entry in json_data if entry.get("zipCode") == str(zipcode)]
 
 
+def fall_through_to_api_check(df, location):
+    """For a PropertyProvider, check if a DataFrame retrieved from JSON dumps contains target location.
+    If not, return empty DF to trigger fall-through to an external API call."""
+    params = location_params(location)
+    # TODO: parse dataframe BEFORE calling this to standardize column names when checking DataFrame contents?
+
+
 # lat_long = lat_long_from_zip(98408)
 # address = closest_address_to_lat_long(latitude, longitude)
 # rentometer_api(lat_long)
