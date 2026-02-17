@@ -7,10 +7,10 @@ from gsheets.update_gsheet import PropertySpreadsheet, PropertyGsheet
 # TODO: PropertyPublisher Protocol, PropertyGsheetsPublisher.publish() -> everything in Gsheets
 
 class PropertyPublisher(Protocol):
-  def publish(prop: Property): ...
+  def publish(self, prop: Property): ...
 
 class PropertyGsheetPublisher:
-  def publish(prop: Property):
+  def publish(self, prop: Property):
     client = GoogleSheetsAPIClient()
     gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
     prop_sheet = PropertySpreadsheet(prop)
