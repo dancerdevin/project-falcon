@@ -1,14 +1,7 @@
-from property_intake_func import *
-from property_level_analysis import *
-from spreadsheets import *
-from property_schema import *
-from gsheets.gsheets_client import GoogleSheetsAPIClient, SPREADSHEET_TITLE, SHEET_ONE_TITLE
-from gsheets.create_gsheet import GoogleSheet
-from gsheets.update_gsheet import PropertySpreadsheet, PropertyGsheet
 from property_store import PropertyStore
+from property_publish import PropertyGsheetPublisher
 
-
-def zipcode_to_output(location, output):
+def zipcode_to_output(location, get_option):
     # if output not in VALID_OUTPUTS:
     #     raise Exception("Error: requested output not in list of valid outputs.")
     
@@ -20,20 +13,20 @@ def zipcode_to_output(location, output):
     # parse_rentcast_json_by_zip("rentcast_2025-10-09_16-22-59.json", 98408)
     # rentometer_api("6478 S M St, Tacoma, WA 98408")
 
-    if output != "dump_to_disk_no_pub":
-        # prop_list = build_properties(rentometer_datetime_string=rentometer_result, rentcast_datetime_string=rentcast_result)
-        # prop_list = build_properties(rentometer_data=rentometer_result, rentcast_data=rentcast_result)
-        # prop_obj = prop_list[0]
-        prop_store = PropertyStore()
-        prop_list = prop_store.get("6478 S M St, Tacoma, WA 98408")
-        prop_obj = prop_list[0]
+    # if output != "dump_to_disk_no_pub":
+    # prop_list = build_properties(rentometer_datetime_string=rentometer_result, rentcast_datetime_string=rentcast_result)
+    # prop_list = build_properties(rentometer_data=rentometer_result, rentcast_data=rentcast_result)
+    # prop_obj = prop_list[0]
+    prop_list = PropertyStore().get(location)
+    prop_obj = prop_list[0]
 
-        client = GoogleSheetsAPIClient()
-        gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
-        prop_sheet = PropertySpreadsheet(prop_obj)
-        property_gsheet = PropertyGsheet(prop_sheet, gsheet)
-        property_gsheet.update_values()
-        property_gsheet.update_format()
+    # client = GoogleSheetsAPIClient()
+    # gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
+    # prop_sheet = PropertySpreadsheet(prop_obj)
+    # property_gsheet = PropertyGsheet(prop_sheet, gsheet)
+    # property_gsheet.update_values()
+    # property_gsheet.update_format()
+    PropertyGsheetPublisher().publish(prop_obj)
 
 
 if __name__ == "__main__":
