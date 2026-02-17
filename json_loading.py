@@ -18,7 +18,8 @@ def json_to_df_from_disk(api=None, datetime=None):
         with open(file, "r", encoding="utf-8-sig") as json_dump:
             print(f"Concatenating to dataframe: {file}")
             df = pd.read_json(json_dump)
-            df["filename"] = os.path.basename(file)
+            if api == ExpectedAPIs.RENTCAST or api == ExpectedAPIs.RENTOMETER:
+                df[f"{api}_filename"] = os.path.basename(file)
             df_list.append(df)
 
     if not files:
@@ -61,5 +62,3 @@ def assemble_json_file_string(api, datetime):
         files = glob.glob(glob_string)
 
     return files
-
-# df = json_to_df("rentcast", "2025-10-10_12-42")

@@ -1,6 +1,10 @@
 import pandas as pd
 from enum import StrEnum
 
+
+# TODO: This early code is written for regional Zillow data. It has yet to be integrated into the PropertyStore pipeline or
+# adapted to, e.g., Rentcast data for a given ZIP.
+
 # List of ZIP codes in which we are currently interested:
 zip_codes = [98403, 98404, 98405, 98406, 98407, 98408, 98409, 98418, 98422, 98465, 98424, 98466, 98467, 98332, 98335]
 # Result 9-12-25: 98408, center-south Tacoma, is where annual *growth* is above county average but *rent* is below median.

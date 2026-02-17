@@ -8,15 +8,11 @@ import pandas as pd
 from io import StringIO
 
 
+# TODO: Evaluate respective roles of property_intake_func.py and property_intake_clients.py. What functionality should go where and why?
+# TODO: Normalization of street address strings (this will surely be an issue at some point, even if Rentcast/Rentometer are consistent)
+
 load_dotenv() # Load API keys
 geolocator = Nominatim(user_agent="peregrin_app") # Instantiate address-finder
-
-# VALID_OUTPUTS = [
-#     "dump_to_disk_no_pub",      # Call API, save to disk, stop there
-#     "dump_to_disk_then_pub",    # Call API, save to disk, then pass on to Gsheets
-#     "direct_to_gsheets",        # Call API, don't save to disk, pass on to Gsheets
-#     "from_json_dump"            # Do not call API, pass existing JSON dump to Gsheets
-# ]
 
 
 def lat_long_from_zip(zip_code):
@@ -78,26 +74,22 @@ def api_call_for_json(url, params, name_string, save_to_disk=True, headers={}):
         datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         output_name = f"{name_string}_{datetime_string}.json"
 
-        if save_to_disk:
-            with open(output_name, "w") as f:
-                json.dump(data, f, indent=4)
-
         # Convert to DF
         json_file = StringIO(json.dumps(data))
         df = pd.read_json(json_file)
-        df["filename"] = ""
+
+        if save_to_disk:
+            with open(output_name, "w") as f:
+                json.dump(data, f, indent=4)
+            df[f"{name_string}_filename"] = output_name
+            
+        else:
+            df[f"{name_string}_filename"] = ""
 
         return df
 
     except requests.exceptions.RequestException as err:
         print(f"Error: {err}")
-
-
-def parse_rentcast_json_by_zip(data, zipcode):
-    # Find all entries in a JSON dump with the actual ZIP code (as properties in the vicinity might be included)
-    with open(data, 'r') as file:
-        json_data = json.load(file)
-    subset_data = [entry for entry in json_data if entry.get("zipCode") == str(zipcode)]
 
 
 def find_location_matches_in_cleaned_df(cleaned_df, location):
@@ -116,10 +108,3 @@ def find_location_matches_in_cleaned_df(cleaned_df, location):
         raise Exception("Error: location_params() returned no recognized keys in params dict.")
 
     return subset_df # If there are no matches, subset_df.empty will return True.
-
-# lat_long = lat_long_from_zip(98408)
-# address = closest_address_to_lat_long(latitude, longitude)
-# rentometer_api(lat_long)
-# rentcast_api(98408, 2200)
-# parse_rentcast_json_by_zip("rentcast_2025-10-09_16-22-59.json", 98408)
-# rentometer_api("6478 S M St, Tacoma, WA 98408")

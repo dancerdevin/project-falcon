@@ -1,4 +1,3 @@
-from .gsheets_client import SHEET_ONE_TITLE
 from .create_gsheet import GoogleSheet
 from dataclasses import asdict
 import os
@@ -41,7 +40,7 @@ class PropertyGsheet:
 
   def _cellrange_to_gsheets_string(self, range: CellRange) -> str:
     """Adds sheet name and punctuation required by Google Sheets API for value updates."""
-    return SHEET_ONE_TITLE + "!" + range.as_string
+    return self.gsheet.sheet_one_title + "!" + range.as_string
   
   def _build_gsheets_padding(self, value_data_list, layout):
     """Adds empty strings to replicate spacing between header strings and between value sublists."""
@@ -157,7 +156,7 @@ class PropertyGsheet:
     sheet_id = None
     
     for sheet in self.gsheet.spreadsheet["sheets"]:
-      if sheet["properties"]["title"] == SHEET_ONE_TITLE:
+      if sheet["properties"]["title"] == self.gsheet.sheet_one_title:
         sheet_id = sheet["properties"]["sheetId"]
     if sheet_id is None:
       raise Exception("Error: No match with sheet title found.")

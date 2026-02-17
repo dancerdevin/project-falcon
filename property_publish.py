@@ -1,10 +1,12 @@
 from typing import Protocol
 from spreadsheets import *
 from property_schema import Property
-from gsheets.gsheets_client import GoogleSheetsAPIClient, SPREADSHEET_TITLE, SHEET_ONE_TITLE
+from gsheets.gsheets_client import GoogleSheetsAPIClient, DEFAULT_SPREADSHEET_TITLE, DEFAULT_SHEET_ONE_TITLE
 from gsheets.create_gsheet import GoogleSheet
 from gsheets.update_gsheet import PropertySpreadsheet, PropertyGsheet
-# TODO: PropertyPublisher Protocol, PropertyGsheetsPublisher.publish() -> everything in Gsheets
+
+# TODO: test publish_gsheets_from_property_list() and consider how/where to store. Just a free-floating function in this script right now.
+# TODO: specify non-default spreadsheet title
 
 class PropertyPublisher(Protocol):
   def publish(self, prop: Property): ...
@@ -12,7 +14,9 @@ class PropertyPublisher(Protocol):
 class PropertyGsheetPublisher:
   def publish(self, prop: Property):
     client = GoogleSheetsAPIClient()
-    gsheet = GoogleSheet(client.client, SPREADSHEET_TITLE, SHEET_ONE_TITLE)
+    spreadsheet_title = prop.location.street_address + " " + DEFAULT_SPREADSHEET_TITLE
+    sheet_one_title = prop.location.street_address + " " + DEFAULT_SHEET_ONE_TITLE
+    gsheet = GoogleSheet(client.client, spreadsheet_title=spreadsheet_title, sheet_one_title=sheet_one_title)
     prop_sheet = PropertySpreadsheet(prop)
     property_gsheet = PropertyGsheet(prop_sheet, gsheet)
     property_gsheet.update_values()

@@ -5,8 +5,8 @@ import math
 import pandas as pd
 from io import StringIO
 
+# TODO: standardize format of fetch() between intake API clients however possible (Rentcast needs "results" and Rentometer doesn't).
 
-# TODO: standardize format of fetch() between intake API clients however possible
 class RentcastAPIClient:
    def fetch(self, location, option, results=500):
     print("Calling Rentcast API function for " + str(location))

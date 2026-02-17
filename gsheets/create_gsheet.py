@@ -3,6 +3,7 @@ class GoogleSheet:
   def __init__(self, client, spreadsheet_title, sheet_one_title):
     # TODO: error handling to ensure client is connected and auth'd
     self.client = client
+    self.sheet_one_title = sheet_one_title
     self.sheet_body = {
         "properties": {
           "title": spreadsheet_title

@@ -47,29 +47,19 @@ class PropertyData(ABC):
             elif hasattr(row, fld.name):
                 row_value = getattr(row, fld.name)
                 setattr(prop, fld.name, row_value)
-                # NOTE: the below code should only be necessary when combining properties now but I'll keep it just in case
-                # print(f"Current Value for {fld.name}: {current_value}")
-                # if current_value is not None and current_value != new_value:
-                #     print(f"Warning: {self.__class__.__name__}.{fld.name}: '{current_value}' vs '{new_value}' - keeping first")
-                # elif current_value is None:
-                #     setattr(self, fld.name, new_value)
-                #     print(f"Should be successfully set! It's now {getattr(self, fld.name)}")
 
         return prop
     
     @staticmethod
     def prop_list_to_dataframe(prop_list: List["Property"]) -> DataFrame:
         """Analyze as-complete-as-possible Property objects by populating a big DataFrame where each Property element becomes a row."""
-        # TODO: Run analysis functions contingent on data sources available, e.g., if no 'rentometer_url', don't try to rely on Rentometer data
         prop_dict_list = [prop.as_flat_dict for prop in prop_list]
-        # df = concat([df, prop_df], axis=1) if df.empty else concat([df, prop_df], axis=0) # Stack horizontally once to get columns, then vertically
         df = DataFrame.from_records(prop_dict_list) # Can also just write DataFrame(prop_dict_list) but this makes explicit row-wise concatenation
         return df
     
     @property
     def as_dataframe(self: "property_data_type") -> DataFrame:
         """Converts a single Property object to a DataFrame. No longer used in prop_list_to_dataframe()."""
-        # TODO: optional parameter to pass in existing DF/columns? would that speed this up?
         df = DataFrame()
         for field in fields(self):
             field_type = PropertyData._check_optional_typing(field)
@@ -115,9 +105,9 @@ class PropertyData(ABC):
         for prop in prop_list:
             data_source = None
 
-            if prop.metadata.rentcast_url is not None and prop.metadata.rentometer_url is not None:
+            if prop.metadata.rentcast_id is not None and prop.metadata.rentometer_url is not None:
                 raise Exception("Error: Property data seems to have more than one source, preventing proper bundling.")
-            elif prop.metadata.rentcast_url is not None:
+            elif prop.metadata.rentcast_id is not None:
                 data_source = "rentcast"
             elif prop.metadata.rentometer_url is not None:
                 data_source = "rentometer"
@@ -140,7 +130,7 @@ class PropertyData(ABC):
                 match_found = False
                 for stored_dict in prop_dict_list:
                     if stored_dict["address"] == prop_dict["address"]:
-                        # Match found. Replace missing data.
+                        # Match found. Replace missing data
                         match_found = True
                         if "rentcast_data" not in stored_dict and "rentcast_data" in prop_dict:
                             stored_dict["rentcast_data"] = prop_dict["rentcast_data"]
@@ -156,19 +146,16 @@ class PropertyData(ABC):
 
         # Check for data completion before returning prop_dict_list.
         for prop_dict in prop_dict_list:
-            # NOTE: currently missing a lot of rentometer_data, so commenting out the data completion check for now.
-            # data_sources = ["rentcast_data", "rentometer_data"]
-            # for data_source in data_sources:
-            #     if data_source not in prop_dict:
-            #         print(f"Warning: address {prop_dict["address"]} is still missing {data_source}.")
+            data_sources = ["rentcast_data", "rentometer_data"]
+            for data_source in data_sources:
+                if data_source not in prop_dict:
+                    print(f"Warning: address {prop_dict["address"]} is still missing {data_source}.")
 
             # Drop "address" to make iterating through prop_dict.values() easier: all dict values should be Property objects.
             del prop_dict["address"]
 
         return prop_dict_list
 
-    # TODO: call above helper method to turn the list of properties into a list of dicts of properties and THEN combine that into a list of complete properties,
-    # with merge priority made explicit by reference to dict keys
     @staticmethod
     def combine_partial_prop_data(prop_list: List["Property"]) -> List["Property"]:
         """Take a list of partial Properties presumed to be from different data sources and return a list of complete Properties."""
@@ -198,24 +185,18 @@ class PropertyData(ABC):
                     
                 value = prop_dict[source_key]
                 for field in fields(value):
-                    # print(f"checking {field.name}")
                     # LocationDetails, etc.
                     prop_field_value = getattr(value, field.name)
-                    # print(f"value is {prop_field_value}")
                     # Compare every field in prop_field_value and combined_prop_field_value and replace if latter is None
-                    combined_prop_field_value = getattr(combined_prop, field.name)
-                    # print(f"existing value on combined_prop obj is {combined_prop_field_value}")                    
+                    combined_prop_field_value = getattr(combined_prop, field.name)                  
                     for fld in fields(prop_field_value):
-                        # print(f"checking subfield {fld.name}")
                         nested_prop_fld_value = getattr(prop_field_value, fld.name)
                         nested_cmbd_prop_fld_value = getattr(combined_prop_field_value, fld.name)
-                        # print(f"existing value on combined prop subfield is {nested_cmbd_prop_fld_value}")
                         if nested_cmbd_prop_fld_value is None and nested_prop_fld_value is not None:
                             # Populate the still-None subfields within a given field, but only if the source has actual data
                             setattr(combined_prop_field_value, fld.name, nested_prop_fld_value)
                     # Now update this specific field on the big combined_prop object, without overwriting any not-None subfield values already on it
                     setattr(combined_prop, field.name, combined_prop_field_value)
-                    # print(f"combined_prop is now {combined_prop}")
 
             # Combined_prop should be finished for this dict, so append to combined_prop_list.
             combined_prop_list.append(combined_prop)
@@ -288,9 +269,10 @@ class ValueDetails(PropertyData):
 
 @dataclass    
 class Metadata(PropertyData):
-    filename: Optional[str] = None
     rentometer_url: Optional[str] = None
-    rentcast_url: Optional[str] = None
+    rentcast_id: Optional[str] = None
+    rentometer_filename: Optional[str] = None
+    rentcast_filename: Optional[str] = None
 
 
 @dataclass

@@ -6,6 +6,8 @@ from datetime import datetime
 from amortization.amount import calculate_amortization_amount
 
 
+# TODO: Evaluate respective roles of property_level_analysis.py and classes in property_store.py. What functionality should go where and why?
+
 LOAN_TO_VALUE = .7
 APR = 0.07
 AMORT_MONTHS = 360
@@ -51,7 +53,7 @@ def parse_rentcast_data(df):
     subset_df = df[(df["value"] <= max_value) & (df["bedrooms"] >= min_bedrooms) & (df["bathrooms"] >= min_bathrooms) & (df["propertyType"] == property_type)].reset_index(drop=True)
     return subset_df
 
-
+# NOTE: keeping this legacy code for now until I'm sure that I'm OK with how CompletePropertyAnalyzer works
 # def add_rent_to_parsed_rentcast_data(rentcast_data, rentometer_data):
 #     # For each address in parsed rentcast data, find rent data, add as expected income, and return dataframe.
 #     if ExpectedColumns.PROPERTY_TAX not in rentcast_data.columns.to_list():
@@ -71,7 +73,6 @@ def parse_rentcast_data(df):
 #     subset_rent_data["address"] = subset_rent_data["address"].astype(str)
     
 #     # Debug: check for matching addresses
-#     # TODO: normalize addresses during data intake?
 #     rentcast_addresses = set(rentcast_data["address"].unique())
 #     rentometer_addresses = set(subset_rent_data["address"].unique())
 #     print(f"Rentcast addresses: {rentcast_addresses}")
@@ -83,10 +84,7 @@ def parse_rentcast_data(df):
 
 
 def add_costs_to_parsed_rentcast_data(df):
-    # TODO: conform "objects" to standardized datatypes (do it here for now and figure out where to really do it later)
-    # print(df.info(verbose=True))
-
-    data_type_dict = { # Defaulting to floats for now even if ints might suffice for some
+    data_type_dict = { # NOTE: Defaulting to floats for now even if ints might suffice for some
         "value_est": float64,
         "mean_rent_est": float64,
         "median_rent_est": float64,
@@ -120,17 +118,18 @@ def add_costs_to_parsed_rentcast_data(df):
     return df
 
 
-def clean_aggregated_property_data(list_of_dicts, index_key_match):
-    """Remove fields unnecessary for or incompatible with (i.e., dictionaries) populating Google Sheet."""
-    address_match_dict = {}
-    columns_to_remove = ["id", "address", "addressLine2", "stateFips", "countyFips", "features", "taxAssessments", "propertyTaxes", "history", "owner"]
-    for column_name, value_dicts in list_of_dicts.items():
-            for key, value in value_dicts.items():
-                if key == index_key_match:
-                    if column_name not in columns_to_remove:
-                        address_match_dict[column_name] = value
+# NOTE: address_dict is depreciated in favor of Property objects.
+# def clean_aggregated_property_data(list_of_dicts, index_key_match):
+#     """Remove fields unnecessary for or incompatible with (i.e., dictionaries) populating Google Sheet."""
+#     address_match_dict = {}
+#     columns_to_remove = ["id", "address", "addressLine2", "stateFips", "countyFips", "features", "taxAssessments", "propertyTaxes", "history", "owner"]
+#     for column_name, value_dicts in list_of_dicts.items():
+#             for key, value in value_dicts.items():
+#                 if key == index_key_match:
+#                     if column_name not in columns_to_remove:
+#                         address_match_dict[column_name] = value
 
-    return address_match_dict
+#     return address_match_dict
 
 
 def aggregated_property_data_calc(agg_data):
@@ -151,45 +150,27 @@ def find_address_in_property_analysis_json(address_string, datetime_string=None)
     return subset_df
 
 
-def address_data_to_gsheet(address_string, datetime_string=None):
-    list_of_dicts = json_to_list_of_dicts("property_aggregate_analysis", datetime_string)
-    dict_index_match = None
-    for i in range(len(list_of_dicts)):
-        # Check all the aggregate analyses in the list of JSON dumps.
-        for key, indices in list_of_dicts[i].items():
-            if key == "address":
-                # Focus on the address field in each dict in the list.
-                for index_key, value in indices.items():
-                    if address_string in value:
-                        # Match found in a dict. Now hone in on the specific address data row with the index_key.
-                        print("Address match found.")
-                        dict_index_match = i
-                        index_key_match = index_key
-                        break
+# def address_data_to_gsheet(address_string, datetime_string=None):
+#     list_of_dicts = json_to_list_of_dicts("property_aggregate_analysis", datetime_string)
+#     dict_index_match = None
+#     for i in range(len(list_of_dicts)):
+#         # Check all the aggregate analyses in the list of JSON dumps.
+#         for key, indices in list_of_dicts[i].items():
+#             if key == "address":
+#                 # Focus on the address field in each dict in the list.
+#                 for index_key, value in indices.items():
+#                     if address_string in value:
+#                         # Match found in a dict. Now hone in on the specific address data row with the index_key.
+#                         print("Address match found.")
+#                         dict_index_match = i
+#                         index_key_match = index_key
+#                         break
     
-    if dict_index_match is not None:
-        # Having found an address match, clean and get all information pertaining to that address.
-        address_match_dict = clean_aggregated_property_data(list_of_dicts[dict_index_match], index_key_match)
+#     if dict_index_match is not None:
+#         # Having found an address match, clean and get all information pertaining to that address.
+#         address_match_dict = clean_aggregated_property_data(list_of_dicts[dict_index_match], index_key_match)
     
-    if address_match_dict:
-        return address_match_dict
-    else:
-        raise Exception("Error: no match found for address string in specified JSON files.")
-
-
-
-# property_df = rentcast_data_parser("2025-10-10_12-42-27")
-# joined_data = add_rent_to_parsed_rentcast_data(property_df, "2025-10-22_13-42")
-# costs_data = add_costs_to_parsed_rentcast_data(joined_data)
-# df = property_aggregate_analysis("2025-10-10_12-42-27", "2025-10-22_13-42")
-# property_analysis_to_json(df)
-# subset_df = find_address_in_property_analysis_json("7236 S Bell St", "2025-10-28")
-# subset_df.to_csv("test_find_address.csv")
-# address_match = address_data_to_gsheet("7236 S Bell St", "2025-10-28")
-# print(address_match)
-# df = parse_rentcast_data("2025-10-10_12-42-27")
-# df_with_rent = add_rent_to_parsed_rentcast_data(df, "2025-10-22_13-42")
-# prop_list = build_properties("2025-10-10_12-42-27", "2025-10-22_13-42")
-# print(prop_list[1])
-# print(prop_list[1].values)
-# print(prop_list[1].COL_NAMES)
+#     if address_match_dict:
+#         return address_match_dict
+#     else:
+#         raise Exception("Error: no match found for address string in specified JSON files.")
