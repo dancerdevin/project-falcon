@@ -82,7 +82,7 @@ def api_call_for_json(url, params, name_string, save_to_disk=True, headers={}):
             with open(output_name, "w") as f:
                 json.dump(data, f, indent=4)
             df[f"{name_string}_filename"] = output_name
-            
+
         else:
             df[f"{name_string}_filename"] = ""
 
@@ -100,11 +100,22 @@ def find_location_matches_in_cleaned_df(cleaned_df, location):
     # Possible keys: "address", "zipCode", "latitude", "longitude." Assume I'm asking exclusively for 1) address, 2) zip, 3) lat-long
     if "address" in params:
         subset_df = cleaned_df[cleaned_df["street_address"] == params["address"]]
+
     elif "zipCode" in params:
         subset_df = cleaned_df[cleaned_df["zip_code"] == params["zipCode"]]
+
     elif "latitude" in params and "longitude" in params:
         subset_df = cleaned_df[cleaned_df["latitude"] == params["latitude"] and cleaned_df["longitude"] == params["longitude"]]
+
     else:
         raise Exception("Error: location_params() returned no recognized keys in params dict.")
+    
+    # Drop dupes. Ignore, e.g, "rentcast_filename" as this will be differ on duplicate data taken from different JSON dumps. Just keep first
+    cols_to_check = [col for col in subset_df.columns if "filename" not in col and "url" not in col]
+    subset_df = subset_df.drop_duplicates(subset=cols_to_check)
+    print(subset_df)
+
+    df_length = len(subset_df)
+    print(f"Number of rows in DataFrame after JSON location match check: {df_length}")
 
     return subset_df # If there are no matches, subset_df.empty will return True.

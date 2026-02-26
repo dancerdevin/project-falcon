@@ -45,10 +45,6 @@ def parse_rentcast_data(df):
             cols_to_drop.append(col)
     df = df.drop(cols_to_drop, axis=1)
 
-    # Ignore "filename" as this will be differ on duplicate data taken from different JSON dumps. Just keep first
-    cols_to_check = [col for col in df.columns if col != 'filename']
-    df = df.drop_duplicates(subset=cols_to_check)
-
     # Parse dataframe by specified constants and return.
     subset_df = df[(df["value"] <= max_value) & (df["bedrooms"] >= min_bedrooms) & (df["bathrooms"] >= min_bathrooms) & (df["propertyType"] == property_type)].reset_index(drop=True)
     return subset_df
