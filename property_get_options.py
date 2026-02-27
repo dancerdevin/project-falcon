@@ -1,6 +1,11 @@
 from enum import Enum, auto
 
-class PropertyGetOptions(Enum):
+class PropertyLocationType(Enum):
+  ADDRESS = auto()
+  ZIP = auto()
+  LATLONG = auto()
+
+class PropertyGetOption(Enum):
   JSON_ONLY = auto()
   JSON_FIRST_THEN_API_NO_UPDATE = auto()
   JSON_FIRST_THEN_API_AND_UPDATE_JSON = auto()
@@ -10,17 +15,17 @@ class PropertyGetOptions(Enum):
 # Divide PropertyGetOptions into distinct and potentially overlapping sublists.
 
 JSON_GET_OPTIONS = [
-  PropertyGetOptions.JSON_ONLY,
-  PropertyGetOptions.JSON_FIRST_THEN_API_NO_UPDATE,
-  PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON
+  PropertyGetOption.JSON_ONLY,
+  PropertyGetOption.JSON_FIRST_THEN_API_NO_UPDATE,
+  PropertyGetOption.JSON_FIRST_THEN_API_AND_UPDATE_JSON
 ]
 
 JSON_FIRST_OPTIONS = [
-  PropertyGetOptions.JSON_FIRST_THEN_API_NO_UPDATE,
-  PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON
+  PropertyGetOption.JSON_FIRST_THEN_API_NO_UPDATE,
+  PropertyGetOption.JSON_FIRST_THEN_API_AND_UPDATE_JSON
 ]
 
 UPDATE_JSON_OPTIONS = [
-   PropertyGetOptions.API_ONLY_AND_JSON_DUMP,
-   PropertyGetOptions.JSON_FIRST_THEN_API_AND_UPDATE_JSON
+   PropertyGetOption.API_ONLY_AND_JSON_DUMP,
+   PropertyGetOption.JSON_FIRST_THEN_API_AND_UPDATE_JSON
 ]

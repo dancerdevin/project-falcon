@@ -6,6 +6,7 @@ from datetime import datetime
 from geopy.geocoders import Nominatim
 import pandas as pd
 from io import StringIO
+from property_get_options import PropertyLocationType
 
 
 # TODO: Evaluate respective roles of property_intake_func.py and property_intake_clients.py. What functionality should go where and why?
@@ -30,28 +31,22 @@ def lat_long_from_zip(zip_code):
     return [str(latitude), str(longitude)] # Stringify for API call and return as list
 
 
-def location_params(location, params={}):
-    # Meta-function to determine if API call will be passed an address or a lat-long.
-    if isinstance(location, str):
-        if " " not in location: # Infer input without whitespace is stringified zipcode
-            params["zipCode"] = location
-        else: # Infer input with whitespace is address
-            location = ' '.join(location.split()) # Normalize whitespace from JSON dump
-            params["address"] = location
+def location_params(location_type: PropertyLocationType, location: str, params={}):
+    # Meta-function to determine if API call will be passed an address, zip, or a lat-long.
+    if location_type == PropertyLocationType.ADDRESS:
+        location = ' '.join(location.split()) # Normalize whitespace from JSON dump
+        params["address"] = location
 
-    elif isinstance(location, int):
-        if len(str(location)) != 5:
-            raise Exception("Error: invalid zipcode input. Must have length of 5.")
+    elif location_type == PropertyLocationType.ZIP:
         params["zipCode"] = location
 
-    elif isinstance(location, list):
-        if len(location) != 2:
-            raise Exception("Error: list input should contain two elements, latitude and longitude.")
+    elif location_type == PropertyLocationType.LATLONG:
+        # TODO: this code still assumes a list instead of a string. Consider how to stringify latlong
         params["latitude"] = location[0]
         params["longitude"] = location[1]
 
     else:
-        raise Exception("Error: for location, please input either an address as a string or lat-long as list.")
+        raise Exception("location_params() did not recognize any valid location_type input.")
     
     return params
 
@@ -92,19 +87,19 @@ def api_call_for_json(url, params, name_string, save_to_disk=True, headers={}):
         print(f"Error: {err}")
 
 
-def find_location_matches_in_cleaned_df(cleaned_df, location):
+def find_location_matches_in_cleaned_df(cleaned_df, location_type, location):
     """For a PropertyProvider, check if a DataFrame retrieved from JSON dumps contains target location.
     If not, return empty DF to trigger fall-through to an external API call."""
-    params = location_params(location)
+    params = location_params(location_type=location_type, location=location)
 
     # Possible keys: "address", "zipCode", "latitude", "longitude." Assume I'm asking exclusively for 1) address, 2) zip, 3) lat-long
-    if "address" in params:
+    if location_type == PropertyLocationType.ADDRESS:
         subset_df = cleaned_df[cleaned_df["street_address"] == params["address"]]
 
-    elif "zipCode" in params:
+    elif location_type == PropertyLocationType.ZIP:
         subset_df = cleaned_df[cleaned_df["zip_code"] == params["zipCode"]]
 
-    elif "latitude" in params and "longitude" in params:
+    elif location_type == PropertyLocationType.LATLONG:
         subset_df = cleaned_df[cleaned_df["latitude"] == params["latitude"] and cleaned_df["longitude"] == params["longitude"]]
 
     else:
@@ -113,8 +108,5 @@ def find_location_matches_in_cleaned_df(cleaned_df, location):
     # Drop dupes. Ignore, e.g, "rentcast_filename" as this will be differ on duplicate data taken from different JSON dumps. Just keep first
     cols_to_check = [col for col in subset_df.columns if "filename" not in col and "url" not in col]
     subset_df = subset_df.drop_duplicates(subset=cols_to_check)
-
-    # df_length = len(subset_df)
-    # print(f"Number of rows in DataFrame after JSON location match check: {df_length}")
 
     return subset_df # If there are no matches, subset_df.empty will return True.

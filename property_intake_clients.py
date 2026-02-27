@@ -1,6 +1,6 @@
 from property_intake_func import location_params, api_call_for_json
 import os
-from property_get_options import UPDATE_JSON_OPTIONS
+from property_get_options import PropertyGetOption, PropertyLocationType, UPDATE_JSON_OPTIONS
 import math
 import pandas as pd
 from io import StringIO
@@ -8,7 +8,7 @@ from io import StringIO
 # TODO: standardize format of fetch() between intake API clients however possible (Rentcast needs "results" and Rentometer doesn't).
 
 class RentcastAPIClient:
-   def fetch(self, location, option, results=500):
+   def fetch(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption, results=500):
     print("Calling Rentcast API function for " + str(location))
     # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
@@ -22,7 +22,7 @@ class RentcastAPIClient:
         "price": "250000:550000",
     }
 
-    params = location_params(location, default_params)
+    params = location_params(location_type, location, default_params)
 
     headers = {
         "X-API-KEY": API_KEY,
@@ -62,7 +62,7 @@ class RentcastAPIClient:
 
 
 class RentometerAPIClient:
-  def fetch(self, location, option):
+  def fetch(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption):
     # Write JSON dump from Rentometer API call.
     print("Calling Rentometer API function for " + str(location))
     API_KEY = os.getenv("RENTOMETER_API_KEY")
@@ -76,7 +76,7 @@ class RentometerAPIClient:
         "building_type": "house"
     }
 
-    params = location_params(location, default_params)
+    params = location_params(location_type, location, default_params)
 
     if not option:
         raise Exception("Error: please specify PropertyGetOption")
