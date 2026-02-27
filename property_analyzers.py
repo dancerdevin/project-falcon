@@ -56,6 +56,10 @@ class CompletePropertyAnalyzer:
     # Estimated monthly costs, summed
     df["sum_est_costs"] = df[["mortgage_est", "insurance_est", "capex_est", "mgmt_est"]].sum(axis=1)
 
+    # Aggregate property functions
+    df["est_costs_per_sqft_house"] = df["value_est"] / df["sqft"]
+    df["est_cost_per_sqft_land"] = df["value_est"] / df["lot_size"]
+
     analyzed_prop = PropertyData.build_property_from_dataframe(df)
     return analyzed_prop
   

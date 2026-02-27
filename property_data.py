@@ -276,6 +276,8 @@ class ValueDetails(PropertyData):
     capex_est: Optional[float] = None
     mgmt_est: Optional[float] = None
     sum_est_costs: Optional[float] = None
+    est_costs_per_sqft_house: Optional[float] = None
+    est_cost_per_sqft_land: Optional[float] = None
 
 
 @dataclass    

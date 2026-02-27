@@ -1,5 +1,5 @@
 from property_data import Property, PropertyData
-from typing import Protocol, List
+from typing import Protocol
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 from property_get_options import PropertyLocationType, PropertyGetOption, JSON_GET_OPTIONS, JSON_FIRST_OPTIONS
 from json_loading import json_to_df_from_disk
