@@ -113,9 +113,8 @@ def find_location_matches_in_cleaned_df(cleaned_df, location):
     # Drop dupes. Ignore, e.g, "rentcast_filename" as this will be differ on duplicate data taken from different JSON dumps. Just keep first
     cols_to_check = [col for col in subset_df.columns if "filename" not in col and "url" not in col]
     subset_df = subset_df.drop_duplicates(subset=cols_to_check)
-    print(subset_df)
 
-    df_length = len(subset_df)
-    print(f"Number of rows in DataFrame after JSON location match check: {df_length}")
+    # df_length = len(subset_df)
+    # print(f"Number of rows in DataFrame after JSON location match check: {df_length}")
 
     return subset_df # If there are no matches, subset_df.empty will return True.

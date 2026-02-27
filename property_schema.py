@@ -111,7 +111,6 @@ class PropertyData(ABC):
         if not isinstance(prop_list, List):
             raise TypeError("combine_partial_prop_data expects a list of Properties.")
         
-        print(prop_list)
         combined_prop_list = []
         
         # First, turn the big list of partial Properties from different data sources into a list of dicts bundling partial Properties on address
@@ -163,7 +162,6 @@ class PropertyData(ABC):
         prop_dict_list = []
         for prop in prop_list:
             data_source = None
-            print(prop)
 
             if prop.metadata.rentcast_id is not None and prop.metadata.rentometer_url is not None:
                 raise Exception("Error: Property data seems to have more than one source, preventing proper bundling.")
