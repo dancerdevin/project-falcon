@@ -6,5 +6,5 @@ from property_get_options import PropertyLocationType, PropertyGetOption
 # 	* probably leave street address normalization as a TODO or refer to easy techniques
 
 if __name__ == "__main__":
-    prop_obj = PropertyStore().get_property(PropertyLocationType.ADDRESS, "6478 S M St, Tacoma, WA 98408", PropertyGetOption.API_ONLY)
+    prop_obj = PropertyStore().get_property(PropertyLocationType.ADDRESS, "6478 S M St, Tacoma, WA 98408", PropertyGetOption.JSON_ONLY)
     PropertyGsheetPublisher().publish(prop_obj)

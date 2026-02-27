@@ -1,7 +1,7 @@
 from property_data import Property
 from typing import List
 from property_get_options import PropertyGetOption, PropertyLocationType
-from property_providers import *
+from property_provider import *
 from property_analyzers import *
 
 # TODO: When I pull data from a database rather than JSON dumps, the analysis should already be done. Check if a PropertyAnalyzer() should be instantiated?

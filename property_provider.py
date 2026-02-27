@@ -15,12 +15,6 @@ class PropertyProvider(Protocol):
   def _clean(self, df: DataFrame) -> DataFrame: ...
 
 
-class PropertiesProvider(Protocol):
-  def request_properties(location_type: PropertyLocationType, location: str, option: PropertyGetOption) -> List[Property]: ...
-
-  def _clean(self, df: DataFrame) -> DataFrame: ...
-
-
 class CompletePropertyProvider:
   """List distinct PropertyProviders and go through them as needed. This will return a completely initialized Property object."""
   def request_property(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption) -> Property:
@@ -44,28 +38,6 @@ class CompletePropertyProvider:
     analyzed_prop = combined_prop_analyzer.analyze_property(combined_prop)
 
     return analyzed_prop
-
-
-class CompletePropertiesProvider:
-  """List distinct PropertyProviders and go through them as needed. This will return a completely initialized List of Property objects."""
-  # TODO: Implement to work with PropertyStore.get_properties()
-  def request_properties(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption) -> List[Property]:
-    # TODO: distinguish between ZIP or LATLONG type input as needed
-
-    rentcast_provider = RentcastPropertyProvider()
-    rentcast_prop_list = rentcast_provider.request_property(location_type=location_type, location=location, option=option)
-
-    rentometer_provider = RentometerPropertyProvider()
-    rentometer_prop_list = rentometer_provider.request_properties(location_type=location_type, location=location, option=option)
-
-    # TODO: more elegant or explicit way of collecting all provided data
-    all_prop_data = rentcast_prop_list + rentometer_prop_list
-    combined_prop_list = PropertyData.combine_partial_prop_data(all_prop_data)
-
-    combined_prop_analyzer = CompletePropertyAnalyzer()
-    analyzed_prop_list = combined_prop_analyzer.analyze_properties(combined_prop_list)
-
-    return analyzed_prop_list
 
 
 class RentcastPropertyProvider:
@@ -94,26 +66,6 @@ class RentcastPropertyProvider:
 
     prop = PropertyData.build_property_from_dataframe(rentcast_df)
     return prop
-  
-  # TODO: this should be in RentcastPropertiesProvider
-  def request_properties(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption) -> List[Property]:
-    rentcast_df = DataFrame()
-
-    if option in JSON_GET_OPTIONS:
-      rentcast_df = json_to_df_from_disk("rentcast", "")
-      rentcast_df = self._clean(rentcast_df)
-      rentcast_df = find_location_matches_in_cleaned_df(cleaned_df=rentcast_df, location_type=location_type, location=location)
-
-    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentcast_df.empty): # Encompass 1) fall-through for JSON-first or 2) API call only.
-      rentcast_df = RentcastAPIClient().fetch(location_type=location_type, location=location, option=option)
-      rentcast_df = self._clean(rentcast_df)
-      rentcast_df = find_location_matches_in_cleaned_df(cleaned_df=rentcast_df, location_type=location_type, location=location)
-
-    if rentcast_df.empty:
-      print("Warning: No properties associated with that location could be found in the Rentcast data.")
-
-    prop_list = PropertyData.build_properties_from_dataframe(rentcast_df)
-    return prop_list
   
   def _clean(self, df: DataFrame) -> DataFrame:
     # df = parse_rentcast_data(df)
@@ -178,21 +130,6 @@ class RentometerPropertyProvider:
 
     prop = PropertyData.build_property_from_dataframe(rentometer_df)
     return prop
-
-  # TODO: this should be in RentcastPropertiesProvider (separate PropertyProvider and PropertiesProvider code for shorter script?)
-  def request_properties(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption) -> List[Property]:
-    if option in JSON_GET_OPTIONS:
-      rentometer_df = json_to_df_from_disk("rentometer", "")
-      rentometer_df = self._clean(rentometer_df)
-      rentometer_df = find_location_matches_in_cleaned_df(cleaned_df=rentometer_df, location_type=location_type, location=location)
-
-    if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentometer_df.empty):
-      rentometer_df = RentometerAPIClient().fetch(location_type=location_type, location=location, option=option)
-      rentometer_df = self._clean(rentometer_df)
-      rentometer_df = find_location_matches_in_cleaned_df(cleaned_df=rentometer_df, location_type=location_type, location=location)
-
-    prop_list = PropertyData.build_properties_from_dataframe(rentometer_df)
-    return prop_list
   
   def _clean(self, df: DataFrame) -> DataFrame:
     df = df[["address", "mean", "median", "min", "max", "quickview_url", "rentometer_filename"]].reset_index(drop=True)
