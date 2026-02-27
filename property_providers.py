@@ -1,4 +1,4 @@
-from property_schema import Property, PropertyData
+from property_data import Property, PropertyData
 from typing import Protocol, List
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 from property_get_options import JSON_GET_OPTIONS, JSON_FIRST_OPTIONS

@@ -1,4 +1,4 @@
-from property_schema import Property, PropertyData
+from property_data import Property, PropertyData
 from typing import Protocol, List
 import pandas as pd
 from numpy import float64

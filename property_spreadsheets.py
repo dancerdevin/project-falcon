@@ -1,5 +1,5 @@
 from spreadsheets import CellRange, Layout, RowLabelsByBlock, ValuesByBlock, FormatRule, FormatSpec, ColumnHeaders, AllRowLabels, AllValues
-from property_schema import Property
+from property_data import Property
 from dataclasses import asdict, dataclass
 from typing import List
 

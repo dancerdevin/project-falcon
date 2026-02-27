@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict
 from typing import Protocol, Sequence, List
-from property_schema import Property
+from property_data import Property
 
 # NOTE: create Spreadsheet class to hold format information and take data like Property objects (or Locale objects?)
 # NOTE: functionality to interface with json files using json_loading.py that can be swapped out for a future database

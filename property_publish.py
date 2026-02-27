@@ -1,6 +1,6 @@
 from typing import Protocol
 from spreadsheets import *
-from property_schema import Property
+from property_data import Property
 from gsheets.gsheets_client import GoogleSheetsAPIClient, DEFAULT_SPREADSHEET_TITLE, DEFAULT_SHEET_ONE_TITLE
 from gsheets.create_gsheet import GoogleSheet
 from gsheets.update_gsheet import PropertySpreadsheet, PropertyGsheet

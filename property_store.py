@@ -1,4 +1,4 @@
-from property_schema import Property
+from property_data import Property
 from typing import List
 from property_get_options import PropertyGetOptions
 from property_providers import *

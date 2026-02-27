@@ -1,6 +1,6 @@
 """Renderer test: Property bundle -> Layout/Formatting code -> tuples of cell ranges and format specs"""
 from spreadsheets import *
-from property_schema import *
+from property_data import *
 from property_level_analysis import *
 from dataclasses import asdict
 
