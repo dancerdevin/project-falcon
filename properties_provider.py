@@ -2,7 +2,7 @@ from property_data import Property, PropertyData
 from typing import Protocol, List
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 from property_get_options import PropertyLocationType, PropertyGetOption, JSON_GET_OPTIONS, JSON_FIRST_OPTIONS
-from json_loading import json_to_df_from_disk
+from property_loader import JSONPropertyLoader
 from property_intake_func import find_location_matches_in_cleaned_df
 import pandas as pd
 from pandas import DataFrame
@@ -51,7 +51,7 @@ class RentcastPropertiesProvider:
     rentcast_df = DataFrame()
 
     if option in JSON_GET_OPTIONS:
-      rentcast_df = json_to_df_from_disk("rentcast", "")
+      rentcast_df = JSONPropertyLoader().load_as_df("rentcast", "")
       rentcast_df = self._clean(rentcast_df)
       rentcast_df = find_location_matches_in_cleaned_df(cleaned_df=rentcast_df, location_type=location_type, location=location)
 
@@ -114,7 +114,7 @@ class RentcastPropertiesProvider:
 class RentometerPropertyProvider:
   def request_properties(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption) -> List[Property]:
     if option in JSON_GET_OPTIONS:
-      rentometer_df = json_to_df_from_disk("rentometer", "")
+      rentometer_df = JSONPropertyLoader().load_as_df("rentometer", "")
       rentometer_df = self._clean(rentometer_df)
       rentometer_df = find_location_matches_in_cleaned_df(cleaned_df=rentometer_df, location_type=location_type, location=location)
 
