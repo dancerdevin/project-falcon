@@ -53,6 +53,7 @@ class FormatData:
 class PropertySpreadsheet:
   def __init__(self, prop: Property):
     """Generates a Layout, list of ValueData, and list of FormatData."""
+    # TODO: explicitly generate header row from list of columns instead of over-generalizing (currently header is "magical")
     self.layout = Layout.build_layout(prop)
     self.value_data_list = ValueData.value_data_list_builder(prop)
     self.format_data_list = FormatData.format_data_list_builder(self.layout, FORMAT_RULES)

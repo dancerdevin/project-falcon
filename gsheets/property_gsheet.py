@@ -16,7 +16,7 @@ from typing import List, Dict
 Populate Google Sheet object with property data by updating values and formatting.
 """
 
-GSHEET_SPECS = {
+GSHEET_COLORS = {
     "white": {"blue": 1, "red": 1, "green": 1, "alpha": 1},
     "green": {"red": 0.4156, "green": 0.6588, "blue": 0.3098}
 }
@@ -28,10 +28,12 @@ class PropertyGsheet:
     self.gsheet = gsheet
     self.gsheet_id = gsheet._spreadsheet.get("spreadsheetId")
     self.layout = propsheet.layout
+    # TODO: defer from __init__() to not do so much "heavy work" in a constructor
     self.value_data_list = self._build_gsheets_padding(propsheet.value_data_list, self.layout)
     self.format_data_list = propsheet.format_data_list
 
     # For Gsheets update_values() body dicts, pass two big ranges, one including the headers and one not.
+    # TODO: clarify functionality by encompassing in, e.g., _get_absolute_range() helper method
     layout_range_with_headers = CellRange.get_bounding_range_from_layout(self.layout)
     self.layout_range_with_headers_str = self._cellrange_to_gsheets_string(layout_range_with_headers)
     layout_range_without_headers = CellRange.get_bounding_range_from_layout(self.layout, with_headers=0)
@@ -105,13 +107,40 @@ class PropertyGsheet:
     ).execute()
     print("spreadsheets.values.batchUpdate executed.")
 
-  def _repeat_cell_list_builder(self, sheet_id, format_data: FormatData) -> List[Dict]:
-    """Formatting requests in the Google Sheets API involve many complex nested arrays. This helper function unpacks specifications to fit the necessary structure.
-    Because FormatData may select multiple ranges to apply the same specification, returns a list of 'repeat_cell' dictionaries to be cumulatively appended to
+  def update_format(self):
+    """# Format spreadsheet using spreadsheet.batchUpdate(). First get sheet ID"""
+    sheet_id = None
+    
+    for sheet in self.gsheet._spreadsheet["sheets"]:
+      if sheet["properties"]["title"] == self.gsheet._sheet_one_title:
+        sheet_id = sheet["properties"]["sheetId"]
+    if sheet_id is None:
+      raise Exception("Error: No match with sheet title found.")
+
+    # Dynamically map ranges, formatting, and fields to format requests
+    # Because FormatData may apply the same spec to multiple discontiguous ranges, populate a list of repeat_cell dicts, then iterate for Gsheets requests.
+    repeat_cell_list = []
+    for fmt in self.format_data_list:
+      repeat_cell_list += self._build_repeat_cell_list(sheet_id, fmt)
+    format_body = {
+      "requests": [
+        repeat_cell_list
+      ]
+    }
+
+    self.gsheet.client.spreadsheets().batchUpdate(
+      spreadsheetId = self.gsheet_id,
+      body = format_body
+    ).execute()
+    print("spreadsheets.batchUpdate executed.")
+  
+  def _build_repeat_cell_list(self, sheet_id, format_data: FormatData) -> List[Dict]:
+    """Converts native FormatData to Google's expected "repeat cell" dictionary structure to apply formatting to all cells in a given range.
+    Because FormatData may select multiple ranges to apply the same specification, returns a list of dictionaries to be cumulatively appended to
     one big list that update_format() iterates through."""
 
     ranges = format_data.range_list
-    kwargs = format_data.spec
+    spec = format_data.spec
 
     repeat_cell_list = []
     for range in ranges:
@@ -134,14 +163,14 @@ class PropertyGsheet:
       fields_to_append = []
 
       # TODO: As formatting options proliferate, define and call relevant helper functions to do the work below
-      if "bg_color" in kwargs:
-        user_format_dict["backgroundColor"] = GSHEET_SPECS[kwargs["bg_color"]]
+      if "bg_color" in spec:
+        user_format_dict["backgroundColor"] = GSHEET_COLORS[spec["bg_color"]]
         fields_to_append.append("backgroundColor")
       
-      if "text_color" in kwargs:
+      if "text_color" in spec:
         if "textFormat" not in user_format_dict:
           user_format_dict["textFormat"] = {}
-        user_format_dict["textFormat"]["foregroundColor"] = GSHEET_SPECS[kwargs["text_color"]]
+        user_format_dict["textFormat"]["foregroundColor"] = GSHEET_COLORS[spec["text_color"]]
         fields_to_append.append("textFormat.foregroundColor")
       
       # Join fields list into required fields string
@@ -150,31 +179,3 @@ class PropertyGsheet:
       repeat_cell_list.append(repeat_cell)
 
     return repeat_cell_list
-
-  def update_format(self):
-    """# Format spreadsheet using spreadsheet.batchUpdate(). First get sheet ID"""
-    sheet_id = None
-    
-    for sheet in self.gsheet._spreadsheet["sheets"]:
-      if sheet["properties"]["title"] == self.gsheet._sheet_one_title:
-        sheet_id = sheet["properties"]["sheetId"]
-    if sheet_id is None:
-      raise Exception("Error: No match with sheet title found.")
-
-    # Dynamically map ranges, formatting, and fields to format requests
-    # Because FormatData may apply the same spec to multiple discontiguous ranges, populate a list of repeat_cell dicts, then iterate for Gsheets requests.
-    repeat_cell_list = []
-    for fmt in self.format_data_list:
-      repeat_cell_list += self._repeat_cell_list_builder(sheet_id, fmt)
-    format_body = {
-      "requests": [
-        repeat_cell_list
-      ]
-    }
-
-    self.gsheet.client.spreadsheets().batchUpdate(
-      spreadsheetId = self.gsheet_id,
-      body = format_body
-    ).execute()
-    print("spreadsheets.batchUpdate executed.")
-  

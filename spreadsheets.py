@@ -153,6 +153,7 @@ class Selector(Protocol):
   def resolve(self, layout: Layout) -> List[CellRange]: ...
 
 
+# TODO: codify somehow rather than using strings to specify FormatSpec
 @dataclass(frozen=True)
 class FormatSpec:
   """Formatting model to express formatting intent, e.g., font, background"""

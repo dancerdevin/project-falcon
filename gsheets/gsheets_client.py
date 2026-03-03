@@ -17,16 +17,13 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 API_NAME = "sheets"
 API_VERSION = "v4"
 
-# Spreadsheet constants, e.g., title
-DEFAULT_SPREADSHEET_TITLE = "Property Spreadsheet"
-DEFAULT_SHEET_ONE_TITLE = "Property Sheet"
-
 
 class GoogleSheetsAPIClient:
-  """Generate Google Sheet from aggregate data on a single property."""
+  """Build Google Sheets API client."""
   def __init__(self):
     self.creds = None
     self.client = None
+    # TODO: Simplify initialization and defer build_client() outside of __init__()
     self.build_client()
 
   def build_and_store_creds(self):

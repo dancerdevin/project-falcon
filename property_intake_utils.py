@@ -7,9 +7,10 @@ from geopy.geocoders import Nominatim
 import pandas as pd
 from io import StringIO
 from property_get_options import PropertyLocationType
+from pandas import DataFrame
+from typing import Dict
 
 
-# TODO: Evaluate respective roles of property_intake_func.py and property_intake_clients.py. What functionality should go where and why?
 # TODO: Normalization of street address strings (this will surely be an issue at some point, even if Rentcast/Rentometer are consistent)
 
 load_dotenv() # Load API keys
@@ -17,6 +18,7 @@ geolocator = Nominatim(user_agent="peregrin_app") # Instantiate address-finder
 
 
 def lat_long_from_zip(zip_code):
+    # TODO: potentially incorporate into "get_properties() if PropertyLocationType.ZIP" pipeline when implemented.
     # Return central latitude and longitude for a given ZIP code, for use in API calls.
     nomi = pgeocode.Nominatim('us')
 
@@ -31,7 +33,7 @@ def lat_long_from_zip(zip_code):
     return [str(latitude), str(longitude)] # Stringify for API call and return as list
 
 
-def location_params(location_type: PropertyLocationType, location: str, params={}):
+def location_params(location_type: PropertyLocationType, location: str, params={}) -> Dict:
     # Meta-function to determine if API call will be passed an address, zip, or a lat-long.
     if location_type == PropertyLocationType.ADDRESS:
         location = ' '.join(location.split()) # Normalize whitespace from JSON dump
@@ -59,8 +61,8 @@ def closest_address_to_lat_long(latitude, longitude):
         raise Exception("Error: Geolocator did not return a valid location.")
     
 
-def api_call_for_json(url, params, name_string, save_to_disk=True, headers={}):
-    # Centralized meta-function for API calls. Writes .json file to disk.
+def fetch_json_from_api(url, params, name_string, save_to_disk=True, headers={}) -> DataFrame:
+    # Centralized meta-function for API calls. Converts JSON to DF and optionally writes .json file to disk.
     try:
         response = requests.get(url, params=params, headers=headers)
         response.raise_for_status()

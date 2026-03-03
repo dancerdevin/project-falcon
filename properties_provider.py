@@ -3,7 +3,7 @@ from typing import Protocol, List
 from property_intake_clients import RentcastAPIClient, RentometerAPIClient
 from property_get_options import PropertyLocationType, PropertyGetOption, JSON_GET_OPTIONS, JSON_FIRST_OPTIONS
 from property_loader import JSONPropertyLoader
-from property_intake_func import find_location_matches_in_cleaned_df
+from property_intake_utils import find_location_matches_in_cleaned_df
 import pandas as pd
 from pandas import DataFrame
 from property_analyzers import *
@@ -56,7 +56,7 @@ class RentcastPropertiesProvider:
       rentcast_df = find_location_matches_in_cleaned_df(cleaned_df=rentcast_df, location_type=location_type, location=location)
 
     if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentcast_df.empty): # Encompass 1) fall-through for JSON-first or 2) API call only.
-      rentcast_df = RentcastAPIClient().fetch(location_type=location_type, location=location, option=option)
+      rentcast_df = RentcastAPIClient().get_properties(location_type=location_type, location=location, option=option)
       rentcast_df = self._clean(rentcast_df)
       rentcast_df = find_location_matches_in_cleaned_df(cleaned_df=rentcast_df, location_type=location_type, location=location)
 
@@ -119,7 +119,7 @@ class RentometerPropertyProvider:
       rentometer_df = find_location_matches_in_cleaned_df(cleaned_df=rentometer_df, location_type=location_type, location=location)
 
     if option not in JSON_GET_OPTIONS or (option in JSON_FIRST_OPTIONS and rentometer_df.empty):
-      rentometer_df = RentometerAPIClient().fetch(location_type=location_type, location=location, option=option)
+      rentometer_df = RentometerAPIClient().get_summary(location_type=location_type, location=location, option=option)
       rentometer_df = self._clean(rentometer_df)
       rentometer_df = find_location_matches_in_cleaned_df(cleaned_df=rentometer_df, location_type=location_type, location=location)
 

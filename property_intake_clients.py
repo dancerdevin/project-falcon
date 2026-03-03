@@ -1,14 +1,14 @@
-from property_intake_func import location_params, api_call_for_json
+from property_intake_utils import location_params, fetch_json_from_api
 import os
 from property_get_options import PropertyGetOption, PropertyLocationType, UPDATE_JSON_OPTIONS
 import math
 import pandas as pd
 from io import StringIO
+from pandas import DataFrame
 
-# TODO: standardize format of fetch() between intake API clients however possible (Rentcast needs "results" and Rentometer doesn't).
 
 class RentcastAPIClient:
-   def fetch(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption, results=500):
+   def get_properties(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption, results=500) -> DataFrame:
     print("Calling Rentcast API function for " + str(location))
     # Write JSON dump from Rentcast API call.
     API_KEY = os.getenv("RENTCAST_API_KEY")
@@ -40,7 +40,7 @@ class RentcastAPIClient:
 
         else:
             save_to_disk = True if option in UPDATE_JSON_OPTIONS else False
-            data = api_call_for_json(URL, params, "rentcast", headers=headers, save_to_disk=save_to_disk)
+            data = fetch_json_from_api(URL, params, "rentcast", headers=headers, save_to_disk=save_to_disk)
 
     return data
    
@@ -52,7 +52,7 @@ class RentcastAPIClient:
         params["offset"] = str(i * 500)
         print("Attempting API call with offset of " + params["offset"])
         save_to_disk = True if option in UPDATE_JSON_OPTIONS else False
-        data = api_call_for_json(URL, params, "rentcast", headers, save_to_disk)
+        data = fetch_json_from_api(URL, params, "rentcast", headers, save_to_disk)
         with open(data, "r", encoding="utf-8-sig") as json_dump:
             print(f"Concatenating data subset {i} to dataframe")
             df = pd.read_json(StringIO(json_dump))
@@ -62,7 +62,7 @@ class RentcastAPIClient:
 
 
 class RentometerAPIClient:
-  def fetch(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption):
+  def get_summary(self, location_type: PropertyLocationType, location: str, option: PropertyGetOption) -> DataFrame:
     # Write JSON dump from Rentometer API call.
     print("Calling Rentometer API function for " + str(location))
     API_KEY = os.getenv("RENTOMETER_API_KEY")
@@ -82,6 +82,6 @@ class RentometerAPIClient:
         raise Exception("Error: please specify PropertyGetOption")
     else:
         save_to_disk = True if option in UPDATE_JSON_OPTIONS else False
-        data = api_call_for_json(URL, params, "rentometer", save_to_disk=save_to_disk)
+        data = fetch_json_from_api(URL, params, "rentometer", save_to_disk=save_to_disk)
             
     return data
